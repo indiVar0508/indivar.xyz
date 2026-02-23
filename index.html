@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Indivar Mishra | Software Engineer & Community Builder</title>
+    <meta name="description"
+        content="Personal portfolio of Indivar Mishra. Python enthusiast, community builder at BangPypers, and software engineer.">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Space+Grotesk:wght@300;400;600&display=swap"
+        rel="stylesheet">
+
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/animations.css">
+
+    <!-- Dependencies -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+
+<body>
+
+    <div class="background-globes">
+        <div class="globe globe-1"></div>
+        <div class="globe globe-2"></div>
+        <div class="globe globe-3"></div>
+    </div>
+
+    <nav class="navbar glass">
+        <div class="container nav-container">
+            <a href="#" class="logo" onclick="app.router('home')">Indivar<span class="accent">.</span></a>
+            <ul class="nav-links">
+                <li><a href="#about" onclick="app.router('home', 'about')">About</a></li>
+                <li><a href="#projects" onclick="app.router('home', 'projects')">Projects</a></li>
+                <li><a href="#blog" onclick="app.router('blog')">Blog</a></li>
+                <li><a href="https://www.linkedin.com/in/indivar-mishra/" target="_blank">Contact</a></li>
+            </ul>
+            <button class="theme-toggle" onclick="app.toggleTheme()" aria-label="Toggle Theme">
+                <i class="fas fa-moon"></i>
+            </button>
+            <div class="mobile-menu-btn">
+                <i class="fas fa-bars"></i>
+            </div>
+        </div>
+    </nav>
+
+    <main id="app-root">
+        <!-- Dynamic Content will be injected here -->
+    </main>
+
+    <footer class="glass-footer">
+        <div class="container footer-content">
+            <p>&copy; <span id="year"></span> Indivar Mishra. Built with <i class="fas fa-heart accent"></i> and Python.
+            </p>
+            <div class="social-links">
+                <a href="https://github.com/indiVar0508" target="_blank" aria-label="GitHub"><i
+                        class="fab fa-github"></i></a>
+                <a href="https://www.linkedin.com/in/indivar-mishra/" target="_blank" aria-label="LinkedIn"><i
+                        class="fab fa-linkedin"></i></a>
+
+            </div>
+        </div>
+    </footer>
+
+    <!-- Templates -->
+    <template id="home-template">
+        <section id="hero" class="hero-section">
+            <div class="container hero-content">
+                <div class="hero-text">
+                    <h1 class="fade-in-up">Hi, I'm <span class="gradient-text">Indivar</span></h1>
+                    <h2 class="fade-in-up delay-1">Python Enthusiast & <br>Community Builder</h2>
+                    <p class="fade-in-up delay-2">Crafting elegant software and fostering tech communities at
+                        BangPypers.</p>
+                    <div class="cta-group fade-in-up delay-3">
+                        <button class="btn primary" onclick="app.router('home', 'projects')">View Work</button>
+                        <button class="btn secondary" onclick="app.router('blog')">Read Blog</button>
+                    </div>
+                </div>
+                <div class="hero-visual fade-in delay-2">
+                    <div class="profile-placeholder glass">
+                        <img src="https://media.licdn.com/dms/image/v2/D5603AQG0GCpS3x2w2w/profile-displayphoto-shrink_400_400/profile-displayphoto-shrink_400_400/0/1725906288490?e=1772668800&v=beta&t=ImxFAEwxYKBeJ8O6qlZ8wCt-oytG9Wu6aX4IGPwjzLw"
+                            alt="Indivar Mishra Linkdin Profile Photo" height="100%">
+                        <!-- <i class="fas fa-user-astronaut"></i> -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="about" class="section">
+            <div class="container">
+                <h2 class="section-title">About Me</h2>
+                <div class="about-grid">
+                    <div class="about-card glass">
+                        <i class="fas fa-code icon-large"></i>
+                        <h3>Developer</h3>
+                        <p>Passionate about Python, Automation, RL, and Web Technologies. Building robust solutions that
+                            scale.</p>
+                    </div>
+                    <div class="about-card glass">
+                        <i class="fas fa-users icon-large"></i>
+                        <h3>Community</h3>
+                        <p>Active contributor and organizer at <strong>BangPypers</strong>. I believe in growing
+                            together through knowledge sharing.</p>
+                    </div>
+                    <div class="about-card glass">
+                        <i class="fas fa-laptop-code icon-large"></i>
+                        <h3>Open Source</h3>
+                        <p>Advocate for open source software. Contributing code and documentation to help others build
+                            better.</p>
+                    </div>
+                </div>
+
+                <div class="glass" style="margin-top: 2rem; padding: 2rem; text-align: center;">
+                    <h3 class="card-title" style="margin-bottom: 1rem;"><i class="fas fa-hand-holding-droplet"
+                            style="color: var(--accent); margin-right: 0.5rem;"></i> Beyond Tech</h3>
+                    <p style="color: var(--text-muted); max-width: 800px; margin: 0 auto; line-height: 1.6;">
+                        While my professional journey is in tech, I hold a strong belief in the importance of
+                        <strong>Water Conservation</strong> and <strong>Social Work for Education</strong>.
+                        These causes shape my perspective on building sustainable and impactful solutions for the
+                        community.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <section id="projects" class="section">
+            <div class="container">
+                <h2 class="section-title">Projects</h2>
+                <div class="projects-grid" id="projects-container">
+                    <!-- Projects injected via JS -->
+                </div>
+            </div>
+        </section>
+
+        <section id="oss" class="section">
+            <div class="container">
+                <h2 class="section-title">OSS Contributions</h2>
+                <p style="text-align: center; max-width: 600px; margin: 0 auto 3rem auto; color: var(--text-muted);">
+                    I believe in giving back to the tools I use. Here are some of my contributions to the open source
+                    ecosystem.
+                </p>
+                <div class="oss-grid" id="oss-container">
+                    <!-- OSS injected via JS -->
+                </div>
+            </div>
+        </section>
+
+
+    </template>
+
+    <template id="blog-list-template">
+        <section class="section blog-section">
+            <div class="container">
+                <h2 class="section-title">Journal</h2>
+                <div class="blog-categories">
+                    <button class="pill active" onclick="app.filterBlog('all')">All</button>
+                    <button class="pill" onclick="app.filterBlog('tech')">Tech</button>
+                    <button class="pill" onclick="app.filterBlog('community')">Community</button>
+                </div>
+                <div class="blog-grid" id="blog-posts-container">
+                    <!-- Blog posts injected here -->
+                </div>
+            </div>
+        </section>
+    </template>
+
+    <template id="blog-post-template">
+        <section class="section blog-post-section">
+            <div class="container post-container glass">
+                <button class="back-btn" onclick="app.router('blog')"><i class="fas fa-arrow-left"></i> Back to
+                    Blog</button>
+                <article id="markdown-content" class="markdown-body">
+                    <!-- Markdown Rendered Content -->
+                </article>
+            </div>
+        </section>
+    </template>
+
+    <script src="js/app.js"></script>
+</body>
+
+</html>
