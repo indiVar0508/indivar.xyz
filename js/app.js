@@ -39,18 +39,19 @@ const app = {
         const root = document.getElementById('app-root');
 
         if (view === 'home') {
-            const template = document.getElementById('home-template');
-            root.innerHTML = '';
-            root.appendChild(template.content.cloneNode(true));
-            app.loadProjects(); // Re-bind projects
-            app.loadOSS();      // Re-bind OSS
+            const isHomeLoaded = document.getElementById('hero');
+            if (!isHomeLoaded) {
+                const template = document.getElementById('home-template');
+                root.innerHTML = '';
+                root.appendChild(template.content.cloneNode(true));
+                app.loadProjects(); // Re-bind projects
+                app.loadOSS();      // Re-bind OSS
+            }
 
             if (sectionId) {
                 // Wait for DOM
-                setTimeout(() => {
-                    const el = document.getElementById(sectionId);
-                    if (el) el.scrollIntoView({ behavior: 'smooth' });
-                }, 100);
+                const el = document.getElementById(sectionId);
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
             }
         } else if (view === 'blog') {
             const template = document.getElementById('blog-list-template');

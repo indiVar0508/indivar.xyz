@@ -334,69 +334,394 @@ body.light-theme .navbar {
     animation: pulse 15s infinite;
 }
 
-/* Celestial Bodies */
-.blackhole {
+/* --- Advanced Celestial Bodies --- */
+
+/* 1. Blackhole (Night Theme) */
+.blackhole-container {
+    position: fixed;
+    bottom: 5%;
+    left: 10%;
+    width: 300px;
+    height: 300px;
+    z-index: 10;
+    /* Bring above stars */
+    pointer-events: none;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    animation: floatSpace 20s ease-in-out infinite alternate;
+}
+
+body.light-theme .blackhole-container {
+    display: none;
+}
+
+/* Event Horizon & Photon Sphere */
+.blackhole-core {
     position: absolute;
-    top: 40%;
-    right: 5%;
-    width: 500px;
-    height: 500px;
+    width: 120px;
+    height: 120px;
+    background: #000;
     border-radius: 50%;
-    background: radial-gradient(circle at center, #000 20%, rgba(60, 20, 150, 0.6) 30%, rgba(200, 50, 100, 0.2) 50%, transparent 70%);
-    box-shadow: 0 0 80px rgba(60, 20, 150, 0.4), inset 0 0 20px #000;
-    opacity: 0.8;
-    animation: pulseBlackhole 10s ease-in-out infinite alternate;
-    z-index: -1;
+    box-shadow:
+        0 0 10px 3px rgba(255, 255, 255, 0.8),
+        /* Intense inner photon ring */
+        0 0 40px 15px rgba(255, 120, 50, 0.6),
+        /* Orange hot gas */
+        0 0 90px 40px rgba(100, 50, 255, 0.4);
+    /* Extended purple corona */
+    z-index: 3;
+    animation: blackholePulse 5s ease-in-out infinite alternate;
+}
+
+/* Deep Space Nebula Background */
+.blackhole-container::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background:
+        radial-gradient(circle at 30% 30%, rgba(138, 43, 226, 0.15) 0%, transparent 40%),
+        radial-gradient(circle at 70% 60%, rgba(0, 206, 209, 0.1) 0%, transparent 50%),
+        radial-gradient(circle at 40% 80%, rgba(255, 20, 147, 0.1) 0%, transparent 40%);
+    filter: blur(20px);
+    z-index: 1;
+    /* Behind accretion disks */
+    animation: nebulaDrift 15s ease-in-out infinite alternate;
     pointer-events: none;
 }
 
-@keyframes pulseBlackhole {
+@keyframes nebulaDrift {
     0% {
-        transform: scale(0.95);
-        opacity: 0.6;
-        box-shadow: 0 0 60px rgba(60, 20, 150, 0.3), inset 0 0 20px #000;
+        transform: scale(1) rotate(0deg);
+        opacity: 0.8;
     }
 
     100% {
-        transform: scale(1.05);
-        opacity: 0.9;
-        box-shadow: 0 0 120px rgba(60, 20, 150, 0.6), inset 0 0 30px #000;
+        transform: scale(1.1) rotate(5deg);
+        opacity: 1;
     }
 }
 
-body.light-theme .blackhole {
-    display: none;
-}
-
-.sun {
-    display: none;
-}
-
-body.light-theme .sun {
-    display: block;
+/* Front Accretion Disk */
+.accretion-disk-front {
     position: absolute;
-    top: -150px;
-    right: -100px;
-    width: 800px;
-    height: 800px;
+    width: 360px;
+    height: 80px;
     border-radius: 50%;
-    background: radial-gradient(circle at center, #fffbd6 0%, #ffdf00 15%, rgba(255, 140, 0, 0.2) 40%, transparent 60%);
-    box-shadow: 0 0 150px rgba(255, 200, 0, 0.4);
-    opacity: 0.7;
-    animation: shine 8s ease-in-out infinite alternate;
-    z-index: -1;
-    pointer-events: none;
+    border: 18px solid rgba(255, 120, 50, 0.8);
+    border-top-color: transparent;
+    /* Cut out top to simulate rotating around */
+    border-bottom: 22px solid rgba(255, 200, 100, 0.95);
+    filter: blur(4px);
+    transform: rotate(-15deg);
+    z-index: 4;
+    /* In front of blackhole */
+    box-shadow: 0 20px 40px rgba(255, 100, 30, 0.5);
 }
 
-@keyframes shine {
+/* Back/Top Warped Accretion Disk (Gravitational Lensing) */
+.accretion-disk-back {
+    position: absolute;
+    width: 180px;
+    height: 250px;
+    border-radius: 50%;
+    border: 15px solid rgba(255, 120, 50, 0.5);
+    border-bottom-color: transparent;
+    /* Stop it at the bottom */
+    border-top: 22px solid rgba(255, 150, 80, 0.7);
+    filter: blur(5px);
+    transform: translateY(-40px);
+    z-index: 2;
+    /* Behind event horizon */
+}
+
+@keyframes floatSpace {
+    0% {
+        transform: translateY(0px) rotate(0deg);
+    }
+
+    100% {
+        transform: translateY(-15px) rotate(2deg);
+    }
+}
+
+@keyframes blackholePulse {
+    0% {
+        transform: scale(0.98);
+        box-shadow: 0 0 8px 2px rgba(255, 255, 255, 0.7), 0 0 30px 10px rgba(255, 120, 50, 0.5), 0 0 70px 30px rgba(100, 50, 255, 0.3);
+    }
+
+    100% {
+        transform: scale(1.02);
+        box-shadow: 0 0 12px 4px rgba(255, 255, 255, 0.9), 0 0 50px 20px rgba(255, 120, 50, 0.7), 0 0 110px 50px rgba(100, 50, 255, 0.5);
+    }
+}
+
+/* 2. Sun & Clouds (Day Theme) */
+.day-sky {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(to bottom, #74b9ff 0%, #e0f6ff 100%);
+    z-index: 5;
+    /* Cover stars and globes */
+    display: none;
+    overflow: hidden;
+    pointer-events: none;
+    animation: fadeInDay 1s forwards;
+}
+
+body.light-theme .day-sky {
+    display: block;
+}
+
+/* Ensure navbar stays above the sky */
+body.light-theme .navbar {
+    z-index: 100;
+}
+
+@keyframes fadeInDay {
     from {
-        transform: scale(0.95);
-        opacity: 0.6;
+        opacity: 0;
     }
 
     to {
-        transform: scale(1.05);
-        opacity: 0.8;
+        opacity: 1;
+    }
+}
+
+/* The Sun */
+.day-sun {
+    position: absolute;
+    top: 15%;
+    right: 15%;
+    width: 100px;
+    height: 100px;
+    background: #fff;
+    border-radius: 50%;
+    box-shadow:
+        0 0 0 15px rgba(255, 255, 255, 0.3),
+        0 0 50px 30px rgba(255, 220, 100, 0.5),
+        0 0 120px 60px rgba(255, 200, 50, 0.2);
+    animation: sunGlowDay 4s ease-in-out infinite alternate;
+}
+
+@keyframes sunGlowDay {
+    0% {
+        transform: scale(0.98);
+        box-shadow: 0 0 0 10px rgba(255, 255, 255, 0.2), 0 0 40px 20px rgba(255, 220, 100, 0.4), 0 0 100px 50px rgba(255, 200, 50, 0.15);
+    }
+
+    100% {
+        transform: scale(1.02);
+        box-shadow: 0 0 0 20px rgba(255, 255, 255, 0.4), 0 0 60px 40px rgba(255, 220, 100, 0.6), 0 0 140px 70px rgba(255, 200, 50, 0.25);
+    }
+}
+
+/* Clouds */
+.clouds {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.cloud {
+    position: absolute;
+    background: #fff;
+    border-radius: 50px;
+    opacity: 0.85;
+    filter: drop-shadow(0 5px 15px rgba(0, 0, 0, 0.03));
+    /* Using specific animations below */
+}
+
+.cloud::before,
+.cloud::after {
+    content: '';
+    position: absolute;
+    background: #fff;
+    border-radius: 50%;
+}
+
+/* Cloud 1 */
+.cloud-1 {
+    top: 25%;
+    left: -200px;
+    width: 180px;
+    height: 60px;
+    animation: floatCloud1 45s linear infinite;
+}
+
+.cloud-1::before {
+    width: 80px;
+    height: 80px;
+    top: -35px;
+    left: 30px;
+}
+
+.cloud-1::after {
+    width: 100px;
+    height: 100px;
+    top: -50px;
+    right: 30px;
+}
+
+/* Cloud 2 */
+.cloud-2 {
+    top: 15%;
+    left: -200px;
+    width: 140px;
+    height: 50px;
+    opacity: 0.6;
+    animation: floatCloud2 65s linear infinite;
+}
+
+.cloud-2::before {
+    width: 60px;
+    height: 60px;
+    top: -30px;
+    left: 20px;
+}
+
+.cloud-2::after {
+    width: 80px;
+    height: 80px;
+    top: -40px;
+    right: 20px;
+}
+
+/* Cloud 3 */
+.cloud-3 {
+    top: 35%;
+    left: -250px;
+    width: 250px;
+    height: 80px;
+    opacity: 0.95;
+    animation: floatCloud3 55s linear infinite;
+}
+
+.cloud-3::before {
+    width: 110px;
+    height: 110px;
+    top: -50px;
+    left: 40px;
+}
+
+.cloud-3::after {
+    width: 140px;
+    height: 140px;
+    top: -70px;
+    right: 40px;
+}
+
+@keyframes floatCloud1 {
+    0% {
+        transform: translateX(-300px);
+    }
+
+    100% {
+        transform: translateX(120vw);
+    }
+}
+
+@keyframes floatCloud2 {
+    0% {
+        transform: translateX(30vw) scale(0.8);
+    }
+
+    100% {
+        transform: translateX(120vw) scale(0.8);
+    }
+}
+
+@keyframes floatCloud3 {
+    0% {
+        transform: translateX(70vw) scale(1.2);
+    }
+
+    100% {
+        transform: translateX(120vw) scale(1.2);
+    }
+}
+
+/* Shooting Stars */
+.shooting-stars-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 1;
+    /* Below the blackhole */
+    pointer-events: none;
+    overflow: hidden;
+}
+
+body.light-theme .shooting-stars-container {
+    display: none;
+}
+
+.shooting-star {
+    position: absolute;
+    width: 4px;
+    height: 4px;
+    background: #fff;
+    border-radius: 50%;
+    box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.1), 0 0 0 8px rgba(255, 255, 255, 0.1), 0 0 20px rgba(255, 255, 255, 1);
+    animation: shooting 4s linear infinite;
+    opacity: 0;
+}
+
+.shooting-star::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 150px;
+    height: 1px;
+    background: linear-gradient(90deg, #fff, transparent);
+}
+
+.shooting-star:nth-child(1) {
+    top: 20%;
+    left: 80%;
+    animation-duration: 4s;
+    animation-delay: 1s;
+}
+
+.shooting-star:nth-child(2) {
+    top: 10%;
+    left: 50%;
+    animation-duration: 5s;
+    animation-delay: 3s;
+}
+
+.shooting-star:nth-child(3) {
+    top: 40%;
+    left: 90%;
+    animation-duration: 3.5s;
+    animation-delay: 6s;
+}
+
+@keyframes shooting {
+    0% {
+        transform: translateX(0) translateY(0) rotate(-45deg);
+        opacity: 1;
+    }
+
+    30% {
+        opacity: 1;
+    }
+
+    100% {
+        transform: translateX(-1000px) translateY(1000px) rotate(-45deg);
+        opacity: 0;
     }
 }
 
