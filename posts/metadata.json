@@ -6,13 +6,5 @@
         "category": "Community",
         "summary": "Welcome to my new personal website. Here is how I built it without frameworks.",
         "filename": "hello-world.md"
-    },
-    {
-        "slug": "python-bangalore",
-        "title": "Why I Love the Bangalore Python Community",
-        "date": "October 15, 2025",
-        "category": "Community",
-        "summary": "Reflections on organizing BangPypers meetups and the power of open source.",
-        "filename": "python-bangalore.md"
     }
 ]
