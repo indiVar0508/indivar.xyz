@@ -174,10 +174,11 @@ h4 {
 .navbar {
     position: fixed;
     top: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: auto;
-    min-width: 600px;
+    left: 0;
+    right: 0;
+    margin: 0 auto;
+    width: 90%;
+    max-width: 600px;
     z-index: 1000;
     padding: 0.8rem 2rem;
     border-radius: 50px;
@@ -345,7 +346,13 @@ body.light-theme .navbar {
     height: 300px;
     z-index: 10;
     /* Bring above stars */
-    pointer-events: none;
+    pointer-events: auto;
+    /* Allow massive 300px area for mobile tapping */
+    cursor: pointer;
+    touch-action: manipulation;
+    /* Prevent double-tap-to-zoom on mobile */
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -413,13 +420,12 @@ body.light-theme .blackhole-container {
     border-radius: 50%;
     border: 18px solid rgba(255, 120, 50, 0.8);
     border-top-color: transparent;
-    /* Cut out top to simulate rotating around */
     border-bottom: 22px solid rgba(255, 200, 100, 0.95);
     filter: blur(4px);
     transform: rotate(-15deg);
     z-index: 4;
-    /* In front of blackhole */
     box-shadow: 0 20px 40px rgba(255, 100, 30, 0.5);
+    pointer-events: none;
 }
 
 /* Back/Top Warped Accretion Disk (Gravitational Lensing) */
@@ -430,12 +436,11 @@ body.light-theme .blackhole-container {
     border-radius: 50%;
     border: 15px solid rgba(255, 120, 50, 0.5);
     border-bottom-color: transparent;
-    /* Stop it at the bottom */
     border-top: 22px solid rgba(255, 150, 80, 0.7);
     filter: blur(5px);
     transform: translateY(-40px);
     z-index: 2;
-    /* Behind event horizon */
+    pointer-events: none;
 }
 
 @keyframes floatSpace {
@@ -804,6 +809,47 @@ body.light-theme .stars3 {
 
     to {
         transform: translateY(-1000px);
+    }
+}
+
+/* Warp Speed Easter Egg */
+body.warp-speed .stars,
+body.warp-speed .stars2,
+body.warp-speed .stars3,
+body.warp-speed .stars::after,
+body.warp-speed .stars2::after,
+body.warp-speed .stars3::after {
+    height: 150px !important;
+    animation: warpDrift 0.2s linear infinite !important;
+    opacity: 1 !important;
+}
+
+body.warp-speed .blackhole-container {
+    animation: warpShake 0.1s infinite !important;
+    filter: hue-rotate(90deg) brightness(2);
+}
+
+@keyframes warpDrift {
+    from {
+        transform: translateY(-100vh);
+    }
+
+    to {
+        transform: translateY(100vh);
+    }
+}
+
+@keyframes warpShake {
+    0% {
+        transform: translate(2px, 2px) scale(0.9);
+    }
+
+    50% {
+        transform: translate(-2px, -2px) scale(1.1);
+    }
+
+    100% {
+        transform: translate(2px, -2px) scale(1.0);
     }
 }
 
@@ -1205,6 +1251,11 @@ body.light-theme .stars3 {
 
     .hero-text h1 {
         font-size: 2.5rem;
+    }
+
+    .hero-text p {
+        margin-left: auto;
+        margin-right: auto;
     }
 
     .cta-group {

@@ -26,8 +26,41 @@ const app = {
             }
         }
 
+        // Setup easter egg
+        app.setupEasterEgg();
+
         // Listen for hash changes
         window.addEventListener('hashchange', app.handleInitialRoute);
+    },
+
+    setupEasterEgg: () => {
+        let clickCount = 0;
+        let clickTimer;
+        // Target the container to give a much larger click area (300x300 vs 120x120)
+        const blackhole = document.querySelector('.blackhole-container');
+        if (blackhole) {
+            blackhole.addEventListener('click', (e) => {
+                // Prevent any default touch behaviors just in case
+                e.preventDefault();
+                // Ignore clicks in light mode
+                if (document.body.classList.contains('light-theme')) return;
+
+                clickCount++;
+                clearTimeout(clickTimer);
+
+                // Reset after 2 seconds of inactivity
+                clickTimer = setTimeout(() => { clickCount = 0; }, 2000);
+
+                if (clickCount >= 3) {
+                    document.body.classList.add('warp-speed');
+                    // Stop warp speed after 3.5 seconds
+                    setTimeout(() => {
+                        document.body.classList.remove('warp-speed');
+                    }, 3500);
+                    clickCount = 0;
+                }
+            });
+        }
     },
 
     setYear: () => {
