@@ -1,0 +1,8 @@
+- name: CycloneDX Python Library
+  symbol: "◇"
+  description: Merged contributions to cryptographic references, vulnerability timestamps, optional properties, and release publishing.
+  url: https://github.com/CycloneDX/cyclonedx-python-lib/pulls?q=is%3Apr+author%3AindiVar0508
+- name: SQLAlchemy
+  symbol: "≡"
+  description: Contributed pull requests exploring MariaDB generated columns, interval handling, and inherited validators.
+  url: https://github.com/sqlalchemy/sqlalchemy/pulls?q=is%3Apr+author%3AindiVar0508

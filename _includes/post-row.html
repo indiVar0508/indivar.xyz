@@ -1,0 +1,5 @@
+<article class="post-row" data-item data-category="{{ include.post.category | default: 'Notes' | escape }}" data-search="{{ include.post.title | append: ' ' | append: include.post.description | downcase | escape }}">
+  <time datetime="{{ include.post.date | date_to_xmlschema }}">{{ include.post.date | date: '%d %b %Y' }}</time>
+  <div><span class="eyebrow">{{ include.post.category | default: 'Notes' }}</span><h3><a href="{% if include.post.external %}{{ include.post.url }}{% else %}{{ include.post.url | relative_url }}{% endif %}">{{ include.post.title | escape }}</a></h3><p>{{ include.post.description | default: include.post.excerpt | strip_html }}</p></div>
+  <span class="post-arrow" aria-hidden="true">↗</span>
+</article>

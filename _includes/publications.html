@@ -1,0 +1,8 @@
+<div class="publication-list">
+  {% for publication in site.data.publications %}
+  <article class="publication-row">
+    <div><p class="eyebrow">{{ publication.type }} <span aria-hidden="true">/</span> Co-author</p><h3><a href="{{ publication.url }}">{{ publication.title }}</a></h3><p>{{ publication.description }}</p></div>
+    <span class="row-arrow" aria-hidden="true">↗</span>
+  </article>
+  {% endfor %}
+</div>

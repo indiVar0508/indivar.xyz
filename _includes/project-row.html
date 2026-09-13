@@ -1,0 +1,9 @@
+<article class="project-row" data-item data-category="{{ include.project.category | escape }}" data-search="{{ include.project.name | append: ' ' | append: include.project.description | downcase | escape }}">
+  <div class="project-body">
+    <p class="eyebrow">{{ include.project.category }}</p>
+    <h3><a href="{{ include.project.url }}">{{ include.project.name }}</a></h3>
+    <p>{{ include.project.description }}</p>
+    <div class="tags">{% for tag in include.project.tags %}<span>{{ tag }}</span>{% endfor %}</div>
+  </div>
+  <span class="row-arrow" aria-hidden="true">↗</span>
+</article>

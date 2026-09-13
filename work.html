@@ -1,0 +1,17 @@
+---
+title: Work
+section: work
+permalink: /work/
+description: Experiments in Python, artificial intelligence, and game development by Indivar Mishra.
+---
+<div class="container">
+  <header class="page-heading"><p class="eyebrow">PROJECTS & PUBLICATIONS</p><h1>Things I’ve built<span class="accent">.</span></h1><p>Python tools, AI experiments, games, and co-authored research.</p></header>
+  <section class="filter-section" data-filter-section aria-label="Projects">
+    <div class="filter-bar" data-controls hidden><div class="filter-buttons" role="group" aria-label="Filter projects"><button data-filter="all" aria-pressed="true">All projects</button>{% assign categories = site.data.projects | map: 'category' | uniq %}{% for category in categories %}<button data-filter="{{ category }}" aria-pressed="false">{{ category }}</button>{% endfor %}</div></div>
+    <div class="project-list">{% for project in site.data.projects %}{% include project-row.html project=project %}{% endfor %}</div>
+    <p class="empty-state" data-empty hidden>No projects match this filter.</p>
+    <p class="visually-hidden" data-results role="status"></p>
+  </section>
+  <section class="chapter-section" id="publications"><header class="chapter-heading"><p class="eyebrow">PUBLICATIONS</p><h2>Co-authored research.</h2></header>{% include publications.html %}</section>
+  <section class="chapter-section" id="oss"><header class="chapter-heading"><p class="eyebrow">OPEN SOURCE</p><h2>Contributions.</h2></header>{% include contributions.html %}</section>
+</div>

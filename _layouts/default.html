@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="{{ site.lang }}" class="salt-theme salt-theme-next salt-density-low" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% if page.title %}{{ page.title | escape }} · {% endif %}{{ site.title | escape }}</title>
+  <meta name="description" content="{{ page.description | default: page.excerpt | default: site.description | strip_html | normalize_whitespace | escape }}">
+  <meta name="color-scheme" content="light dark">
+  <link rel="canonical" href="{{ page.url | absolute_url }}">
+  <meta property="og:title" content="{{ page.title | default: site.title | escape }}">
+  <meta property="og:description" content="{{ page.description | default: page.excerpt | default: site.description | strip_html | normalize_whitespace | escape }}">
+  <meta property="og:url" content="{{ page.url | absolute_url }}">
+  <meta property="og:type" content="{% if page.layout == 'post' %}article{% else %}website{% endif %}">
+  <meta name="twitter:card" content="summary">
+  <link rel="icon" type="image/svg+xml" href="{{ '/images/favicon.svg' | relative_url }}">
+  {% feed_meta %}
+  <script>try { const theme = localStorage.getItem('theme'); if (theme === 'light' || theme === 'dark') document.documentElement.dataset.theme = theme; } catch (_) {}</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600;700;800&family=PT+Mono&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ '/css/salt-foundations.css' | relative_url }}">
+  <link rel="stylesheet" href="{{ '/css/style.css' | relative_url }}">
+  <script src="{{ '/js/app.js' | relative_url }}" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="{{ '/' | relative_url }}" aria-label="{{ site.title }} — home"><span class="brand-name">{{ site.data.profile.name }}</span></a>
+      <nav aria-label="Main navigation">
+        <a href="{{ '/work/' | relative_url }}" {% if page.section == 'work' %}aria-current="page"{% endif %}>Work</a>
+        <a href="{{ '/#publications' | relative_url }}">Publications</a>
+        <a href="{{ '/blog/' | relative_url }}" {% if page.section == 'writing' %}aria-current="page"{% endif %}>Writing</a>
+        <a href="{{ '/about/' | relative_url }}" {% if page.section == 'about' %}aria-current="page"{% endif %}>About</a>
+      </nav>
+      <div class="header-actions">
+        <button class="theme-toggle" aria-label="Switch to dark theme" title="Switch color theme" hidden>
+          <svg class="moon" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M20.8 13A9 9 0 0 1 11 3.2 9 9 0 1 0 20.8 13Z"/></svg>
+          <svg class="sun" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+  <main id="main" tabindex="-1">{{ content }}</main>
+  <footer class="site-footer">
+    <div class="container footer-top">
+      <div><p class="eyebrow">GET IN TOUCH</p><a class="footer-name" href="{{ site.data.profile.linkedin }}">Let’s make something interesting. <span aria-hidden="true">↗</span></a></div>
+      <div class="footer-links">{% for link in site.data.profile.elsewhere %}<a href="{{ link.url }}">{{ link.label }} <span aria-hidden="true">↗</span></a>{% endfor %}{% if site.data.profile.youtube %}<a href="{{ site.data.profile.youtube }}">YouTube <span aria-hidden="true">↗</span></a>{% endif %}<a href="{{ '/feed.xml' | relative_url }}">RSS <span aria-hidden="true">↗</span></a></div>
+    </div>
+    <div class="container footer-bottom"><span>© {{ site.time | date: '%Y' }} {{ site.data.profile.name }}</span><span>{{ site.data.profile.location }} · {{ site.data.profile.timezone_label }}</span><a href="#main">Back to top ↑</a></div>
+  </footer>
+</body>
+</html>

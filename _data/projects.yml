@@ -1,0 +1,30 @@
+- name: uv Workspace Versioning
+  category: Python tooling
+  description: A Hatch plugin that gives each package in a uv workspace its own version, based on the changes that actually belong to it.
+  tags: [Python, uv, Developer tools]
+  url: https://github.com/indiVar0508/uv-workspace-dynamic-versioning
+  featured: true
+- name: BananiaAI
+  category: AI & games
+  description: A childhood maze game, rebuilt in Python. Play it yourself, or let A* pathfinding find a way through.
+  tags: [Python, Pathfinding, Game dev]
+  url: https://github.com/indiVar0508/BananiaAI
+  featured: true
+- name: Fictional Commentator
+  category: Generative AI
+  description: What if your favorite sitcom characters called the cricket? An experiment in generative AI and function calling.
+  tags: [Python, LLMs, Function calling]
+  url: https://github.com/indiVar0508/Fictional-Commentator
+  featured: true
+- name: FlappyBirdAI
+  category: AI & games
+  description: Learning to fly, one generation at a time. A neural network and NEAT evolve a bot that plays Flappy Bird.
+  tags: [Python, Neural networks, NEAT]
+  url: https://github.com/indiVar0508/FlappyBirdAI
+  featured: false
+- name: Rick & Morty Space Adventures
+  category: AI & games
+  description: A detour into Rust and game development. Help Rick and Morty navigate their way through an asteroid belt.
+  tags: [Rust, Game dev]
+  url: https://github.com/indiVar0508/Rick-and-Morty-Space-Adventures
+  featured: false
