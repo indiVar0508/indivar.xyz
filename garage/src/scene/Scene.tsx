@@ -1,8 +1,13 @@
 import { ContactShadows, Sparkles } from '@react-three/drei';
 import { Car } from '../car/Car';
 import { engineOrigin } from '../car/shots';
+import { ENGINE_TOPICS } from '../content/engine';
+import { ENGINE_ANCHORS } from '../engine/anchors';
 import { Bay } from '../engine/Bay';
 import { P60B40 } from '../engine/P60B40';
+import { useGarage } from '../state/store';
+import { CarHotspots } from '../ui/CarHotspots';
+import { Hotspot } from '../ui/Hotspot';
 import { CameraRig } from './CameraRig';
 import { Effects } from './Effects';
 import { FrameMonitor } from './FrameMonitor';
@@ -22,7 +27,20 @@ export function Scene() {
           <>
             <CameraRig bay={rig.anchors.engineBay} />
             <Bay />
-            <P60B40 origin={engineOrigin(rig.anchors.engineBay)} />
+            <P60B40
+              origin={engineOrigin(rig.anchors.engineBay)}
+              hotspots={(id, selected) => (
+                <Hotspot
+                  position={ENGINE_ANCHORS[id].position}
+                  normal={ENGINE_ANCHORS[id].normal}
+                  label={ENGINE_TOPICS[id].title}
+                  summary={ENGINE_TOPICS[id].summary}
+                  selected={selected}
+                  onSelect={() => useGarage.getState().dispatch({ type: 'select-part', id })}
+                />
+              )}
+            />
+            <CarHotspots rig={rig} />
           </>
         )}
       </Car>
