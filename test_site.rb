@@ -10,7 +10,7 @@ base = ARGV[1] || config.fetch('baseurl', '')
 origin = config.fetch('url').delete_suffix('/')
 errors = []
 pages = Dir.glob("#{root}/**/*.html")
-%w[index.html work/index.html blog/index.html about/index.html blog/hello-world/index.html 404.html].each do |page|
+%w[index.html work/index.html blog/index.html about/index.html blog/hello-world/index.html 404.html garage/index.html].each do |page|
   errors << "Missing page: #{page}" unless File.file?("#{root}/#{page}")
 end
 

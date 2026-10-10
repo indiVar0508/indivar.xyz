@@ -54,12 +54,28 @@ The original Hello World post is preserved at `/blog/hello-world/`; its old `/#p
 | Co-authored papers and book chapters | `_data/publications.yml` |
 | About page | `about.md` |
 | Colors, layout, light/dark theme | Semantic variables at the top of `css/style.css` |
+| Garage app (3D M3 GTR) | `garage/` |
 
 Set `featured: true` on projects to show them on the homepage. Projects display as rows with their name, category, description, tags, and repository link; their order follows `_data/projects.yml`.
 
 Your own YouTube channel, X profile, LinkedIn, and GitHub links are configured in `_data/profile.yml`. The Writing page lists only your Markdown posts. Publications are separate from posts and open source contributions.
 
 Salt color, spacing, and typography foundations are vendored in `css/salt-foundations.css`, with the upstream license in `css/SALT-LICENSE.txt`. This site uses Salt tokens with custom native HTML, not Salt’s React components. Fonts load from Google Fonts with system fallbacks. Source versions and public research are in `docs/research.md`.
+
+## Garage
+
+`garage/` is a separate Vite app served at `/garage/`: an unofficial 3D garage for the BMW M3 GTR (E46) from *Need for Speed: Most Wanted*. Jekyll ignores the folder. `scripts/build-site.sh` builds both, copies the garage into `_site/garage/`, and runs the page checks.
+
+```sh
+cd garage
+npm install
+npm run dev        # http://localhost:5173/
+npm test           # unit tests
+```
+
+Check the combined site with `scripts/build-site.sh`, or `scripts/build-site.sh /tmp/indivar-preview /preview` for a subpath.
+
+The car model is credited in the garage footer and in `garage/CREDITS.md`: This work is based on "BMW M3 E46 GTR" (https://sketchfab.com/3d-models/bmw-m3-e46-gtr-7a0e538dd533481da79a6dcc0fc05213) by Flamestroke (https://sketchfab.com/Flamestroke) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/).
 
 ## Deploy to GitHub Pages
 

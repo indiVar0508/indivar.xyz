@@ -4,6 +4,12 @@
   tags: [Python, uv, Developer tools]
   url: https://github.com/indiVar0508/uv-workspace-dynamic-versioning
   featured: true
+- name: Most Wanted Garage
+  category: 3D & web
+  description: "The BMW M3 GTR from Need for Speed: Most Wanted in a moody 3D garage. Pop the hood and explore its P60B40 V8, right in the browser."
+  tags: [Three.js, React Three Fiber, WebAssembly]
+  url: /garage/
+  featured: true
 - name: BananiaAI
   category: AI & games
   description: A childhood maze game, rebuilt in Python. Play it yourself, or let A* pathfinding find a way through.
