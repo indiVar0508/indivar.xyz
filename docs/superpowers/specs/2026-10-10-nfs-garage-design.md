@@ -97,13 +97,15 @@ The processed `m3-gtr.glb` must contain these nodes (validated by `tools/check-a
 
 | Node | Role |
 | --- | --- |
-| `Body` | painted body shell (livery material) |
-| `Hood` | hood panel; origin at the hinge line, rotation about local X opens it |
-| `Wheel_FL`, `Wheel_FR`, `Wheel_RL`, `Wheel_RR` | wheel groups |
-| `Glass` | all glazing |
-| `EngineBay` | empty marking where the engine sits (origin = crank centerline at the front axle plane, after normalization) |
+| `Body` | group of every non-hood mesh; painted meshes carry `extras.role = "paint"` |
+| `Hood` | group whose origin is the hinge line; rotating about local X opens it |
+| `Glass` | glazing mesh |
+| `Marker_Wheel_FL`, `_FR`, `_RL`, `_RR` | empties at wheel centers (anchors for hotspots and camera shots) |
+| `Marker_EngineBay` | empty at the floor of the empty engine bay, on the centerline |
 
-Normalization: meters, +Y up, car facing +Z, wheels on y = 0, centered on x = 0. Everything else is optional and passed through. If the source has no separate hood, `prepare-car.py` separates body faces inside the hood region (a box above the front fenders, ahead of the windshield base, upward-facing normals) and reports it for visual review.
+Normalization: meters, +Y up, car facing +Z, tyres touching y = 0, centered on x = 0, overall length scaled to 4.49 m. Everything else is passed through.
+
+**Source model findings (inspected 2026-10-10):** the Sketchfab glTF is 30 meshes split by material, not by part, with base-color textures only (no roughness or normal maps); about 117k triangles and 8 MB. The hood is already a separate mesh (`blinn8`) with vent cutouts; its louvre inserts (`aw`, `sd`, `lambert15`) sit inside its outline and move with it. Opening it about its rear edge works cleanly and reveals an empty bay (floor pan and open wheel wells), which confirms §4.4. The four wheels are merged into shared rim, tyre, disc, and caliper meshes, so Phase 1 adds wheel-center markers instead of splitting geometry; splitting moves to Phase 3, where wheels must spin. Painted panels are `blinn3`, `blinn8`, `blinn9`, `blinn10`, `blinn13`, `blinn14`, `blinn18`. Glass (`wind`) is opaque black and becomes dark tinted glass. The hood's underside shows the livery texture, so the runtime renders its back faces with a dark primer material.
 
 ### 4.3 Paint and materials
 
@@ -213,14 +215,14 @@ Runtime decoders: `MeshoptDecoder` and `KTX2Loader` with the Basis transcoder (W
 ## 9. Roadmap
 
 - **Phase 1 (this spec):** garage, hero car, hotspots, opening hood, P60B40 breakdown, synthesized ambience, site integration.
-- **Phase 2, "Under the skin":** Rust crate `garage/crates/p60-audio` compiled to WASM and run in an AudioWorklet: real-time flat-plane V8 synthesis using the real firing order, rev control in the bay; Rust-computed piston and crank kinematics driving an animated exploded engine view; photo mode.
+- **Phase 2, "Under the skin":** starts with a research task the owner asked for: how best to show the engine running (cutaway vs. exploded view, crank, piston, and valve-timing animation, airflow and firing-order visualization, synchronized sound), with references. Then: Rust crate `garage/crates/p60-audio` compiled to WASM and run in an AudioWorklet: real-time flat-plane V8 synthesis using the real firing order, rev control in the bay; Rust-computed piston and crank kinematics driving an animated exploded engine view; photo mode.
 - **Phase 3, "Out of the garage":** Rapier (Rust to WASM) raycast vehicle; roll out to a small night lot; engine audio driven by physics rpm; speedometer and nitrous; evaluate the WebGPU renderer.
 
 ## 10. Risks and fallbacks
 
 | Risk | Fallback |
 | --- | --- |
-| Model lacks a separate hood | Region-based split in `prepare-car.py`, reviewed by screenshot; if the seam is ugly, hide the source hood faces and build a hood panel in code that matches the livery |
+| Model lacks a separate hood | Resolved: the source hood is its own mesh (§4.2) |
 | No engine bay or visible gaps under the hood | Code-built bay tub (§4.4) |
 | Livery texture blurry up close | Upscale the hood and side regions or repaint with a projected livery texture in Blender; a follow-up task only if screenshots show it |
 | Model provenance challenged | Model is one file behind a manifest; swap to another model without code changes |
@@ -230,6 +232,6 @@ Runtime decoders: `MeshoptDecoder` and `KTX2Loader` with the Basis transcoder (W
 
 ## 11. Credits and disclaimer
 
-- Model: "BMW M3 E46 GTR" by Flamestroke, <https://sketchfab.com/3d-models/bmw-m3-e46-gtr-7a0e538dd533481da79a6dcc0fc05213>, licensed CC BY 4.0 (<https://creativecommons.org/licenses/by/4.0/>). Modifications: rescaled, re-centered, hood separated, materials adjusted, compressed.
+- Model credit, shown in the garage footer, `garage/CREDITS.md`, and the README: This work is based on "BMW M3 E46 GTR" (<https://sketchfab.com/3d-models/bmw-m3-e46-gtr-7a0e538dd533481da79a6dcc0fc05213>) by Flamestroke (<https://sketchfab.com/Flamestroke>), licensed under CC-BY-4.0 (<http://creativecommons.org/licenses/by/4.0/>). Modifications: rescaled, re-centered, regrouped, hood pivot set, materials adjusted, compressed.
 - Everything else (garage, engine, audio, UI) is original to this project.
 - *Need for Speed* and *Most Wanted* are trademarks of Electronic Arts. BMW and M3 are trademarks of BMW AG. This project is not affiliated with or endorsed by either.
