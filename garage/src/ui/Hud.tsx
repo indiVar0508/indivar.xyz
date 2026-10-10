@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useGarage } from '../state/store';
 import { isHoodOpen } from '../state/view';
 import { InfoPanel } from './InfoPanel';
+import { SoundControls } from './SoundControls';
 import { breadcrumbFor } from './topicFor';
 
 export function Hud() {
@@ -33,6 +34,7 @@ export function Hud() {
         <button type="button" className="hud-button" onClick={() => dispatch(hoodOpen ? { type: 'close-hood' } : { type: 'select-car', id: 'hood' })}>
           {hoodOpen ? 'Close the hood' : 'Open the hood'}
         </button>
+        <SoundControls />
       </div>
       <p className="hint">Drag to orbit · Pick a marker · Esc to go back</p>
       <InfoPanel />
