@@ -4,12 +4,16 @@
   "version": "0.1.0",
   "description": "Unofficial fan garage for the BMW M3 GTR (E46) from Need for Speed: Most Wanted (2005), served at indivar.xyz/garage/.",
   "type": "module",
-  "engines": { "node": ">=24" },
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run && node tools/check-assets.ts",
+    "check:assets": "node tools/check-assets.ts",
+    "prepare:car": "node tools/prepare-car.ts"
   },
   "dependencies": {
     "@fontsource/pt-mono": "^5.3.0",
@@ -24,11 +28,15 @@
     "zustand": "^5.0.15"
   },
   "devDependencies": {
+    "@gltf-transform/cli": "^4.5.1",
+    "@gltf-transform/core": "^4.5.1",
+    "@gltf-transform/extensions": "^4.5.1",
     "@types/node": "^24.19.2",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@types/three": "^0.186.0",
     "@vitejs/plugin-react": "^6.1.2",
+    "meshoptimizer": "^1.3.0",
     "typescript": "^6.0.3",
     "vite": "^8.3.4",
     "vitest": "^5.0.3"

@@ -1,0 +1,29 @@
+{
+  "lengthMeters": 4.49,
+  "sourcePrefix": "polySurface2732_",
+  "hood": ["blinn8", "aw", "sd", "lambert15"],
+  "glass": "wind",
+  "tyres": "tyre",
+  "paint": ["blinn3", "blinn8", "blinn9", "blinn10", "blinn12", "blinn13", "blinn14", "blinn18"],
+  "rename": {
+    "blinn8": "Hood_Panel",
+    "aw": "Hood_Louvres",
+    "sd": "Hood_LouvreBacks",
+    "lambert15": "Hood_Scoop",
+    "wind": "Glass",
+    "tyre": "Tyres",
+    "blinn1": "Rims",
+    "breka": "BrakeDiscs",
+    "1 car paint.005": "Calipers",
+    "blinn3": "Paint_Trunk",
+    "blinn9": "Paint_Nose",
+    "blinn10": "Paint_Doors",
+    "blinn12": "Paint_Silver",
+    "blinn13": "Paint_Flares",
+    "blinn14": "Paint_Shell",
+    "blinn18": "Paint_Skirts",
+    "lambert6": "Interior",
+    "lambert7": "RearWing",
+    "lambert10": "Grille"
+  }
+}
