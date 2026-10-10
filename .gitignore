@@ -3,3 +3,9 @@ _site/
 .jekyll-metadata
 .bundle/
 vendor/bundle/
+garage/node_modules/
+garage/dist/
+garage/assets-src/
+garage/tools/bin/
+garage/test-results/
+garage/playwright-report/
