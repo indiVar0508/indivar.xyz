@@ -5,8 +5,12 @@ import './ui/base.css';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
+import { QA } from './qa';
+import { useGarage } from './state/store';
 import { Fallback } from './ui/Fallback';
 import { supportsWebGL2 } from './webgl';
+
+if (QA) Object.assign(window, { garage: useGarage });
 
 const root = createRoot(document.getElementById('app')!);
 root.render(<StrictMode>{supportsWebGL2() ? <App /> : <Fallback />}</StrictMode>);
