@@ -14,8 +14,21 @@ export const CAR_SOLIDS: { min: Vec3; max: Vec3 }[] = [
   { min: [-0.9, 0.86, -2.3], max: [0.9, 1.32, -1.7] },
 ];
 
-/** The hood panel, hinged along X at its rear edge. */
-export const HOOD_PANEL = { hinge: [0, 0.804, 0.836] as Vec3, length: 1.288, halfWidth: 0.723 };
+/**
+ * The hood, hinged along X at its rear edge. `profile` is its centreline measured from Hood_Panel, as
+ * [distance toward the nose, height above the hinge, half width] (m) with the hood closed. The E46 hood wraps
+ * down over the nose, so its front lip hangs 0.38 m below the hinge and sits low in front of the open hood.
+ */
+export const HOOD_PANEL = {
+  hinge: [0, 0.804, 0.836] as Vec3,
+  profile: [
+    [0, 0, 0.72],
+    [0.16, 0.05, 0.72],
+    [0.96, -0.11, 0.67],
+    [1.16, -0.15, 0.43],
+    [1.29, -0.38, 0.24],
+  ] as [number, number, number][],
+};
 
 /** Engine origin relative to Marker_EngineBay: crank axis a little low and behind the bay centre. */
 export const ENGINE_OFFSET: Vec3 = [0, -0.02, -0.22];
@@ -31,7 +44,7 @@ export const CAR_SHOTS: Record<CarShotId, Shot> = {
 };
 
 const ENGINE_VIEW_DISTANCE = 1.35;
-const ENGINE_VIEW_BIAS: Vec3 = [0, 0.9, 1.3]; // look from above and from the nose, so the raised hood never blocks the view
+const ENGINE_VIEW_BIAS: Vec3 = [0, 0.6, 1.5]; // look in from the nose, under the raised hood's lip
 
 export const engineOrigin = (bay: Vec3): Vec3 => add(bay, ENGINE_OFFSET);
 
@@ -59,16 +72,24 @@ export function insideSolid(point: Vec3, margin = 0.12): boolean {
   return CAR_SOLIDS.some(({ min, max }) => point.every((v, axis) => v > min[axis]! - margin && v < max[axis]! + margin));
 }
 
-/** Does the segment from→to pass through the hood panel when it is open by `angle` radians? */
+/** Does the segment from→to pass through the hood when it is open by `angle` radians? */
 export function segmentHitsHood(from: Vec3, to: Vec3, panel: typeof HOOD_PANEL, angle: number): boolean {
-  const along: Vec3 = [0, Math.sin(angle), Math.cos(angle)]; // hinge → tip
-  const normal: Vec3 = [0, -Math.cos(angle), Math.sin(angle)]; // x̂ × along
+  const [cos, sin] = [Math.cos(angle), Math.sin(angle)];
+  const lift = ([along, up]: [number, number, number]): Vec3 => add(panel.hinge, [0, up * cos + along * sin, along * cos - up * sin]);
   const delta = sub(to, from);
-  const denominator = dot(normal, delta);
-  if (Math.abs(denominator) < 1e-9) return false;
-  const t = dot(normal, sub(panel.hinge, from)) / denominator;
-  if (t <= 0 || t >= 1) return false;
-  const local = sub(add(from, scale(delta, t)), panel.hinge);
-  const v = dot(local, along);
-  return Math.abs(local[0]) <= panel.halfWidth && v >= 0 && v <= panel.length;
+  for (let i = 1; i < panel.profile.length; i++) {
+    const a = panel.profile[i - 1]!;
+    const b = panel.profile[i]!;
+    const start = lift(a);
+    const edge = sub(lift(b), start);
+    const normal: Vec3 = [0, -edge[2], edge[1]]; // x̂ × edge
+    const denominator = dot(normal, delta);
+    if (Math.abs(denominator) < 1e-9) continue;
+    const t = dot(normal, sub(start, from)) / denominator;
+    if (t <= 0 || t >= 1) continue;
+    const local = sub(add(from, scale(delta, t)), start);
+    const v = dot(local, edge) / dot(edge, edge);
+    if (v >= 0 && v <= 1 && Math.abs(local[0]) <= Math.max(a[2], b[2])) return true;
+  }
+  return false;
 }

@@ -2,7 +2,7 @@ import { MathUtils } from 'three';
 import { describe, expect, it } from 'vitest';
 import { CAR_TOPIC_IDS } from '../content/car';
 import { ENGINE_TOPIC_IDS } from '../content/engine';
-import { BAY, ENGINE_ANCHORS } from '../engine/anchors';
+import { BAY, ENGINE_ANCHORS, RADIATOR } from '../engine/anchors';
 import { add, type Vec3 } from '../math';
 import { ROOM } from '../scene/layout';
 import { CAR_SHOTS, engineOrigin, engineShot, HOOD_PANEL, insideSolid, segmentHitsHood, shotFor } from './shots';
@@ -30,11 +30,25 @@ describe('camera shots', () => {
     for (const [id, shot] of bayShots) expect(segmentHitsHood(shot.position, shot.target, HOOD_PANEL, open), id).toBe(false);
   });
 
+  it('looks over the radiator with room to see the part, not grazing it', () => {
+    const clearance = 0.08; // about the crank pulley's radius
+    for (const [id, { position: p, target: t }] of engineShots) {
+      if (p[2] <= RADIATOR.z) continue;
+      const heightAtRadiator = t[1] + ((RADIATOR.z - t[2]) / (p[2] - t[2])) * (p[1] - t[1]);
+      expect(heightAtRadiator, id).toBeGreaterThan(RADIATOR.top + clearance);
+    }
+  });
+
   it('detects a camera that would look through the hood', () => {
     const above: Vec3 = [0, 3, 1.3];
     expect(segmentHitsHood(above, [0, 0.4, 1.2], HOOD_PANEL, open)).toBe(true);
     expect(segmentHitsHood(above, [0, 0.4, 1.2], HOOD_PANEL, 0)).toBe(true);
     expect(segmentHitsHood([3, 1, 1.2], [2, 1, 1.2], HOOD_PANEL, open)).toBe(false);
+  });
+
+  it('detects the nose lip, which hangs below the open hood', () => {
+    // The first fuel-rail shot looked at the engine through the lip (screenshot, 2026-10-11).
+    expect(segmentHitsHood([-0.15, 1.706, 2.0], [-0.15, 0.65, 1.16], HOOD_PANEL, open)).toBe(true);
   });
 
   it('maps every view to a shot', () => {
