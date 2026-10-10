@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react';
+import { Fragment, useLayoutEffect, useRef, useState } from 'react';
 import type { Badge, Topic } from '../content/types';
 import { useGarage } from '../state/store';
 import { topicFor } from './topicFor';
@@ -10,6 +10,18 @@ function PanelBody({ topic, eyebrow, hint }: { topic: Topic; eyebrow: string; hi
   const tabs = (['real', 'game'] as const).filter((tab) => topic[tab].length > 0);
   const [tab, setTab] = useState<Tab>(tabs[0]!);
   const back = () => useGarage.getState().dispatch({ type: 'back' });
+  const panel = useRef<HTMLElement>(null);
+
+  // Publishes the panel's height so the phone layout can seat the HUD buttons right above the bottom sheet.
+  useLayoutEffect(() => {
+    const root = document.documentElement.style;
+    const observer = new ResizeObserver(([entry]) => root.setProperty('--panel-height', `${entry!.borderBoxSize[0]!.blockSize}px`));
+    observer.observe(panel.current!);
+    return () => {
+      observer.disconnect();
+      root.removeProperty('--panel-height');
+    };
+  }, []);
   const facts = (
     <ul className="facts">
       {topic[tab].map((fact) => (
@@ -31,7 +43,7 @@ function PanelBody({ topic, eyebrow, hint }: { topic: Topic; eyebrow: string; hi
     </ul>
   );
   return (
-    <aside className="panel" aria-labelledby="panel-title">
+    <aside ref={panel} className="panel" aria-labelledby="panel-title">
       <header className="panel-head">
         <p className="eyebrow">{eyebrow}</p>
         <h2 id="panel-title">{topic.title}</h2>

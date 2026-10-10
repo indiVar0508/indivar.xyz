@@ -1,3 +1,4 @@
+import { MathUtils } from 'three';
 import type { CarTopicId } from '../content/car';
 import type { EngineTopicId } from '../content/engine';
 import { ENGINE_ANCHORS } from '../engine/anchors';
@@ -32,6 +33,17 @@ export const HOOD_PANEL = {
 
 /** Engine origin relative to Marker_EngineBay: crank axis a little low and behind the bay centre. */
 export const ENGINE_OFFSET: Vec3 = [0, -0.02, -0.22];
+
+export const CAMERA_FOV = 35;
+
+/** The narrowest horizontal view (degrees) that still holds the whole car in the showroom shot. */
+const MIN_HORIZONTAL_FOV = 42;
+
+/** Vertical field of view for a canvas aspect ratio. Landscape keeps CAMERA_FOV; portrait widens it. */
+export function fovFor(aspect: number): number {
+  const halfWidth = Math.tan(MathUtils.degToRad(MIN_HORIZONTAL_FOV / 2));
+  return Math.max(CAMERA_FOV, MathUtils.radToDeg(2 * Math.atan(halfWidth / aspect)));
+}
 
 export const CAR_SHOTS: Record<CarShotId, Shot> = {
   showroom: { position: [5.4, 1.55, 5.2], target: [0, 0.55, 0] },

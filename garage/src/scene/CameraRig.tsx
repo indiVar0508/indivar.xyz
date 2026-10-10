@@ -1,7 +1,8 @@
 import { CameraControls } from '@react-three/drei';
 import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useRef, type ComponentRef } from 'react';
-import { shotFor } from '../car/shots';
+import { PerspectiveCamera } from 'three';
+import { fovFor, shotFor } from '../car/shots';
 import type { Vec3 } from '../math';
 import { QA } from '../qa';
 import { useGarage } from '../state/store';
@@ -13,7 +14,14 @@ export function CameraRig({ bay }: { bay: Vec3 }) {
   const view = useGarage((state) => state.view);
   const reducedMotion = useGarage((state) => state.reducedMotion);
   const camera = useThree((state) => state.camera);
+  const size = useThree((state) => state.size);
   const idle = useRef(0);
+
+  useEffect(() => {
+    if (!(camera instanceof PerspectiveCamera)) return;
+    camera.fov = fovFor(size.width / size.height);
+    camera.updateProjectionMatrix();
+  }, [camera, size]);
 
   useEffect(() => {
     const { position: p, target: t } = shotFor(view, bay);

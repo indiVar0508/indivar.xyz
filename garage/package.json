@@ -13,7 +13,9 @@
     "preview": "vite preview",
     "test": "vitest run && node tools/check-assets.ts",
     "check:assets": "node tools/check-assets.ts",
-    "prepare:car": "node tools/prepare-car.ts"
+    "prepare:car": "node tools/prepare-car.ts",
+    "check:bundle": "node tools/check-bundle.ts",
+    "qa": "playwright test"
   },
   "dependencies": {
     "@fontsource/pt-mono": "^5.3.0",

@@ -1,11 +1,11 @@
-import { MathUtils } from 'three';
+import { MathUtils, PerspectiveCamera, Vector3 } from 'three';
 import { describe, expect, it } from 'vitest';
 import { CAR_TOPIC_IDS } from '../content/car';
 import { ENGINE_TOPIC_IDS } from '../content/engine';
 import { BAY, ENGINE_ANCHORS, RADIATOR } from '../engine/anchors';
 import { add, type Vec3 } from '../math';
 import { ROOM } from '../scene/layout';
-import { CAR_SHOTS, engineOrigin, engineShot, HOOD_PANEL, insideSolid, segmentHitsHood, shotFor } from './shots';
+import { CAR_SHOTS, CAR_SOLIDS, CAMERA_FOV, engineOrigin, engineShot, fovFor, HOOD_PANEL, insideSolid, segmentHitsHood, shotFor } from './shots';
 import { HOOD_OPEN_DEG } from './hood';
 
 const EXPECTED_BAY: Vec3 = [0, 0.3133, 1.4806]; // prepare-report.json engineBay
@@ -49,6 +49,22 @@ describe('camera shots', () => {
   it('detects the nose lip, which hangs below the open hood', () => {
     // The first fuel-rail shot looked at the engine through the lip (screenshot, 2026-10-11).
     expect(segmentHitsHood([-0.15, 1.706, 2.0], [-0.15, 0.65, 1.16], HOOD_PANEL, open)).toBe(true);
+  });
+
+  it('fits the whole car in the showroom shot, even on a portrait phone', () => {
+    const { min, max } = CAR_SOLIDS[0]!;
+    for (const aspect of [0.46, 0.75, 1.6]) {
+      const camera = new PerspectiveCamera(fovFor(aspect), aspect, 0.05, 60);
+      camera.position.set(...CAR_SHOTS.showroom.position);
+      camera.lookAt(...CAR_SHOTS.showroom.target);
+      camera.updateMatrixWorld();
+      for (const x of [min[0], max[0]]) for (const y of [0, 1.29]) for (const z of [min[2], max[2]]) {
+        const ndc = new Vector3(x, y, z).project(camera);
+        expect(Math.abs(ndc.x), `aspect ${aspect}`).toBeLessThan(1);
+        expect(Math.abs(ndc.y), `aspect ${aspect}`).toBeLessThan(1);
+      }
+    }
+    expect(fovFor(1.6)).toBe(CAMERA_FOV);
   });
 
   it('maps every view to a shot', () => {

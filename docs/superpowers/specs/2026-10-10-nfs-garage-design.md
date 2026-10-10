@@ -39,42 +39,67 @@ Driving or physics, engine sound synthesis, the project's own Rust crate, livery
 
 ```
 garage/
-  index.html               Static shell: <main id="main">, one <h1>, skip link, canonical, noscript/WebGL fallback
-  package.json             private; scripts: dev, build, test, check:assets, qa, prepare:car
-  vite.config.ts           base './'; injects canonical from ../_config.yml url + baseurl (+ SITE_BASEURL override)
+  index.html               Static shell: <main id="main">, one <h1>, skip link, canonical, noscript, credits footer
+  package.json             private; scripts: dev, build, test, check:assets, check:bundle, qa, prepare:car
+  vite.config.ts           base './'; Vitest config
+  build/siteUrl.ts         canonical URL from ../_config.yml url + baseurl (+ SITE_BASEURL override)
+  build/garagePlugin.ts    injects the canonical; serves and emits the Basis transcoder at basis/
   src/
-    main.tsx               mounts <App/>; detects WebGL2, else shows fallback
-    App.tsx                <Canvas> + HUD overlay; Suspense with <Loader/>
-    state.ts               zustand store: view, selection, audio, quality
+    main.tsx               mounts <App/> or the WebGL 2 fallback; binds audio; exposes the store under ?qa
+    App.tsx                <Canvas> + <Hud/> + <Loader/>
+    qa.ts, webgl.ts        ?qa / ?quality= flags; WebGL 2 detection
+    math.ts, random.ts     Vec3 helpers; seeded PRNG
+    state/view.ts          view state machine (pure reducer)
+    state/quality.ts       quality tiers and the frame-time window
+    state/store.ts         zustand store: view, quality, reduced motion, ready, sound, own track
+    content/               types, sources, car and engine topics, validator, loader facts
+    car/manifest.ts        asset contract (shared with tools/check-assets.ts)
+    car/Car.tsx            GLTFLoader (meshopt + KTX2), prepareCar, hood hinge animation
+    car/prepareCar.ts      contract check, paint/glass/primer upgrade, anchors from markers
+    car/paint.ts, hood.ts  material configs; hood angle and easing
+    car/loaders.ts         one KTX2Loader per page
+    car/shots.ts           camera shots, car solids, hood profile, engine shots, portrait FOV
+    car/hotspots.ts        car hotspot positions and normals
+    engine/geometry.ts     P60B40 figures and cylinder layout
+    engine/anchors.ts      engine hotspot anchors, bay box, radiator
+    engine/P60B40.tsx      code-built V8 with highlightable parts
+    engine/Bay.tsx         the bay tub the source model lacks
+    scene/Scene.tsx        composes lights, garage, car, engine, hotspots, effects
     scene/Garage.tsx       floor, walls, roller door, props, hanging tubes
-    scene/Lighting.tsx     key/rim/fill lights, strip-light Environment via drei Lightformers
-    scene/Effects.tsx      N8AO, bloom, vignette, noise, tone mapping; quality-scaled
-    scene/materials.ts     canvas-generated concrete/metal textures (seeded noise)
-    car/Car.tsx            useGLTF (meshopt + KTX2), paint upgrade, hood hinge animation
-    car/manifest.ts        node-name → role map and validation
-    car/shots.ts           camera shots (position, target, fov) in car-local space
-    car/hotspots.ts        car hotspot definitions and content ids
-    engine/P60B40.tsx      code-built V8 and engine bay tub
-    engine/parts.ts        engine part content: facts, sources, accuracy badges
-    content/types.ts       shared Fact/Source/Badge types
-    content/car.ts         car hotspot content (real car vs. in the game)
-    ui/Hotspot.tsx         drei <Html> button anchored to a 3D point
+    scene/props.tsx        workbench, tool chest, tyres, drums, shelf, roller door, corrugated wall, tubes
+    scene/textures.ts      seeded concrete and grime DataTextures
+    scene/layout.ts        room size and tube positions
+    scene/flicker.ts       seeded tube flicker
+    scene/Lighting.tsx     key and rim spots, strip-light Environment via drei Lightformers
+    scene/Effects.tsx      bloom, AgX tone mapping, split tone, vignette, noise; quality-scaled
+    scene/splitTone.ts     teal/amber grade effect
+    scene/CameraRig.tsx    flies to each shot; idle drift (scene/drift.ts)
+    scene/FrameMonitor.tsx drops to low quality on sustained slow frames
+    scene/ReadySignal.tsx  marks the garage ready for the loader, HUD and tests
+    ui/Hotspot.tsx         drei <Html> button anchored to a 3D point, faded by facing
+    ui/CarHotspots.tsx     the six car hotspots
     ui/InfoPanel.tsx       panel with "Real car" / "In the game" tabs, badges, sources
-    ui/Hud.tsx             title, breadcrumbs, audio controls, back link, credits/disclaimer
-    ui/Loader.tsx          progress + facts while loading
-    ui/hud.css             MW-inspired original styling
+    ui/Hud.tsx             breadcrumbs, hood button, sound controls, hint, Esc
+    ui/SoundControls.tsx   sound toggle and "Play my own track"
+    ui/Loader.tsx          progress + verified facts while loading
+    ui/topicFor.ts, facing.ts  view → topic and breadcrumbs; hotspot facing
+    ui/base.css, hud.css   MW-inspired original styling
     audio/ambience.ts      Web Audio graph: room tone, tube hum, traffic, pad
     audio/schedule.ts      pure parameter schedules (testable)
+    audio/noise.ts         brown noise and reverb impulse
     audio/sfx.ts           synthesized hood clunk and UI ticks
-    audio/ownTrack.ts      local file playback via object URL
+    audio/controller.ts    AudioContext owner; local own-track playback via object URL
+    audio/prefs.ts, bindings.ts  remembered sound preference; store → audio wiring
   public/models/m3-gtr.glb processed model, committed, ≤ 12 MB
-  tools/prepare-car.py     headless Blender: normalize, split/rename, hinge, export
-  tools/car-map.json       source object name patterns → roles
-  tools/compress.mjs       gltf-transform: dedup, prune, weld, meshopt, KTX2 (WebP fallback), resize ≤ 2048
-  tools/check-assets.mjs   asserts roles, size, triangle budget
-  tools/install-ktx.sh     fetches KTX-Software CLI into tools/bin (one-time, only for re-processing)
-  tests/smoke.spec.ts      Playwright (local only)
-  assets-src/              raw Sketchfab download (gitignored)
+  tools/prepare-car.ts     orchestrates Blender, glTF-Transform ETC1S (KTX2) and meshopt, then the asset check
+  tools/blender/prepare_car.py  headless Blender: normalize, rename, roles, hinge, markers, report
+  tools/car-map.json       source mesh names → roles and names
+  tools/check-assets.ts    asserts the contract, size and triangle budget
+  tools/check-bundle.ts    asserts the JavaScript gzip budget
+  tools/install-ktx.sh     pins and checksums KTX-Software 4.4.2 into tools/bin (only for re-processing)
+  tools/shot.ts            Playwright screenshots of any sequence of views
+  tests/smoke.spec.ts      Playwright smoke tests (local only)
+  assets-src/              raw Sketchfab download and prepare-report.json (gitignored)
   CREDITS.md               model attribution and license
 ```
 
@@ -105,7 +130,7 @@ The processed `m3-gtr.glb` must contain these nodes (validated by `tools/check-a
 
 Normalization: meters, +Y up, car facing +Z, tyres touching y = 0, centered on x = 0, overall length scaled to 4.49 m. Everything else is passed through.
 
-**Source model findings (inspected 2026-10-10):** the Sketchfab glTF is 30 meshes split by material, not by part, with base-color textures only (no roughness or normal maps); about 117k triangles and 8 MB. The hood is already a separate mesh (`blinn8`) with vent cutouts; its louvre inserts (`aw`, `sd`, `lambert15`) sit inside its outline and move with it. Opening it about its rear edge works cleanly and reveals an empty bay (floor pan and open wheel wells), which confirms §4.4. The four wheels are merged into shared rim, tyre, disc, and caliper meshes, so Phase 1 adds wheel-center markers instead of splitting geometry; splitting moves to Phase 3, where wheels must spin. Painted panels are `blinn3`, `blinn8`, `blinn9`, `blinn10`, `blinn13`, `blinn14`, `blinn18`. Glass (`wind`) is opaque black and becomes dark tinted glass. The hood's underside shows the livery texture, so the runtime renders its back faces with a dark primer material.
+**Source model findings (inspected 2026-10-10):** the Sketchfab glTF is 30 meshes split by material, not by part, with base-color textures only (no roughness or normal maps); about 117k triangles and 8 MB. The hood is already a separate mesh (`blinn8`) with vent cutouts; its louvre inserts (`aw`, `sd`, `lambert15`) sit inside its outline and move with it. Opening it about its rear edge works cleanly and reveals an empty bay (floor pan and open wheel wells), which confirms §4.4. The four wheels are merged into shared rim, tyre, disc, and caliper meshes, so Phase 1 adds wheel-center markers instead of splitting geometry; splitting moves to Phase 3, where wheels must spin. Painted panels are `blinn3`, `blinn8`, `blinn9`, `blinn10`, `blinn12` (silver mirrors and trim), `blinn13`, `blinn14`, `blinn18`. The source poses the front-right wheel steered about 35°, so the car's X bounds are lopsided (-1.07 to 0.93 m); markers sit at the true wheel centers. Glass (`wind`) is opaque black and becomes dark tinted glass. The hood's underside shows the livery texture, so the runtime renders its back faces with a dark primer material.
 
 ### 4.3 Paint and materials
 
@@ -115,7 +140,8 @@ Normalization: meters, +Y up, car facing +Z, tyres touching y = 0, centered on x
 
 ### 4.4 Engine and bay
 
-- The model is expected to have no engine bay, so `P60B40.tsx` also builds a dark bay tub (inner fenders, firewall, radiator face, strut brace) that hides the cavity.
+- The model has no engine bay, so `Bay.tsx` builds a dark bay tub (inner fenders, firewall, radiator face, strut towers) that hides the cavity. The hood's edges fall from 0.79 m at the hinge to 0.62 m near the nose and the nose is only ±0.43 m wide at the radiator, so the walls stop at 0.60 m and z 1.8 m and the radiator is ±0.38 m wide; anything larger shows through the closed hood's seams.
+- The E46 hood wraps down over the nose, so the open hood's lip hangs 0.38 m below its hinge line. The camera's hood-clearance check models the measured centreline profile, not a flat panel.
 - V8: two banks at 90°, four cylinders each. Cylinder geometry derives from bore 94 mm and stroke 72 mm; block length, head size, and accessories are illustrative and scaled to fit the bay. Parts: block, two heads with cam covers, intake plenum with two restrictor inlets, airbox, runners, fuel rails, headers, dry-sump tank and lines, crank pulley. Materials: cast aluminium, machined aluminium, black crinkle paint, carbon, braided hose.
 - Each hotspot part is its own group so it can be framed and highlighted (emissive rim on hover).
 
@@ -151,9 +177,9 @@ Primary sources so far: [Wikipedia: BMW P60B40](https://en.wikipedia.org/wiki/BM
 
 - Floor: polished concrete with seeded canvas-generated albedo, roughness, and stain maps; drei `MeshReflectorMaterial` for soft, blurred reflections (lower resolution on low quality).
 - Walls and props built from primitives with generated textures: corrugated panels, roller door behind the car, workbench, tool chest, tire stack, oil drums, extension cable, parts shelf.
-- Lights: two to three hanging fluorescent tubes (emissive, bloom), one flickering on a seeded schedule; warm amber key spot with shadows; cool teal fill; strip Lightformers in the environment so the paint shows long highlights.
+- Lights: four hanging fluorescent tubes (emissive, bloom, each with a point light), one flickering on a seeded schedule; warm key spot with shadows; cool teal fill; strip Lightformers in the environment so the paint shows long highlights. RectAreaLights were dropped: their lookup tables cost about 100 KB gzip.
 - Atmosphere: exponential fog, faint dust motes, and a grade with teal shadows and amber highlights via tone mapping plus a color-grading pass.
-- Quality tiers: `high` (desktop default) and `low` (coarse pointer or small screen, or measured frame time over 28 ms for 2 s). `low` caps DPR at 1.5, disables AO and reflector blur, and halves shadow-map size.
+- Quality tiers: `high` (desktop default) and `low` (coarse pointer or small screen, or measured frame time over 28 ms for 2 s). `low` caps DPR at 1.5, disables multisampling, noise and reflector blur. Ambient occlusion (N8AO) was dropped from both tiers: about 75 KB gzip for under 1/255 average pixel change in this dark scene with contact shadows.
 
 ### 4.7 Audio
 
@@ -186,17 +212,17 @@ The garage `index.html` satisfies `test_site.rb` as-is: exactly one `<h1>`, `hre
 
 ## 6. Asset pipeline
 
-1. Owner downloads the glTF zip from Sketchfab (account required) into `garage/assets-src/`.
-2. `npm run prepare:car` runs `blender -b --python tools/prepare-car.py -- assets-src/<file> tmp.glb`: normalize, map names via `car-map.json`, split hood if needed, set hinge pivot, add `EngineBay` empty, export.
-3. `tools/compress.mjs`: dedup, prune, weld, resize textures to ≤ 2048, KTX2 (ETC1S for color, UASTC for normal maps) when `tools/bin/ktx` exists, else WebP; meshopt geometry compression.
-4. `tools/check-assets.mjs` validates the contract in §4.2, size ≤ 12 MB, and ≤ 150k triangles.
-5. Commit `public/models/m3-gtr.glb` and update `CREDITS.md`.
+1. Owner downloads the glTF zip from Sketchfab (account required) into `garage/assets-src/` and unzips it into `assets-src/model/`.
+2. `tools/install-ktx.sh` (once) installs KTX-Software 4.4.2, pinned and checksummed.
+3. `npm run prepare:car` runs `blender -b --python tools/blender/prepare_car.py`: normalize, rename via `car-map.json`, tag paint roles, set the hood hinge, add markers, write `assets-src/prepare-report.json`, export. It then runs `gltf-transform etc1s` (KTX2) and `gltf-transform meshopt`, and finally the asset check.
+4. `tools/check-assets.ts` validates the contract in §4.2, size ≤ 12 MB, and ≤ 150k triangles. `npm test` runs it in CI.
+5. Commit `public/models/m3-gtr.glb` (2.8 MB, 116,360 triangles, 18 KTX2 textures) and keep `CREDITS.md` current.
 
 Runtime decoders: `MeshoptDecoder` and `KTX2Loader` with the Basis transcoder (WASM), served from the build output so no CDN is needed.
 
 ## 7. Performance budgets
 
-- Initial JavaScript ≤ 450 KB gzip; model ≤ 12 MB; first meaningful frame under 5 s on a 20 Mbps connection.
+- Initial JavaScript ≤ 450 KB gzip; model ≤ 12 MB; first meaningful frame under 5 s on a 20 Mbps connection. `tools/check-bundle.ts` sums every JS file in `dist/assets`, which includes an unused hashed copy of the Basis transcoder wrapper (15 KB) that three's KTX2Loader emits; the Phase 1 total is about 436 KB.
 - 60 fps on the owner's RTX 4060 laptop at `high`; ≥ 30 fps on a mid-range phone at `low`.
 - No per-frame allocations in hotspot projection or the camera rig.
 
@@ -226,8 +252,8 @@ Runtime decoders: `MeshoptDecoder` and `KTX2Loader` with the Basis transcoder (W
 | No engine bay or visible gaps under the hood | Code-built bay tub (§4.4) |
 | Livery texture blurry up close | Upscale the hood and side regions or repaint with a projected livery texture in Blender; a follow-up task only if screenshots show it |
 | Model provenance challenged | Model is one file behind a manifest; swap to another model without code changes |
-| KTX-Software unavailable | WebP textures via gltf-transform (larger VRAM, same visuals) |
-| Headless WebGL in CI is slow and flaky | Playwright runs locally only; CI relies on unit, asset, and site checks |
+| KTX-Software unavailable | Resolved: `tools/install-ktx.sh` pins and checksums KTX-Software 4.4.2 |
+| Headless WebGL in CI is slow and flaky | Playwright runs locally only, on the full Chromium build with the real GPU (the headless shell falls back to SwiftShader); CI relies on unit, asset, and site checks |
 | CI time grows | npm cache; the garage build is about a minute |
 
 ## 11. Credits and disclaimer

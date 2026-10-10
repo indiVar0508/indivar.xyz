@@ -8,6 +8,7 @@ dest="${1:-_site}"
 base="${2:-}"
 
 SITE_BASEURL="$base" npm --prefix garage run build
+npm --prefix garage run check:bundle
 
 jekyll_args=(build --destination "$dest")
 if [[ -n "$base" ]]; then jekyll_args+=(--baseurl "$base"); fi
