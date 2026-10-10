@@ -7,7 +7,9 @@ import { chromium } from '@playwright/test';
 const [url = 'http://localhost:5173/?qa&quality=high', out = 'test-results/shots', ...actions] = process.argv.slice(2);
 mkdirSync(out, { recursive: true });
 
-const browser = await chromium.launch({ args: ['--ignore-gpu-blocklist', '--enable-gpu-rasterization'] });
+// The full Chromium build (not the headless shell) can use the real GPU; the shell falls back to SwiftShader,
+// which is too slow for this scene.
+const browser = await chromium.launch({ channel: 'chromium', args: ['--use-angle=gl', '--ignore-gpu-blocklist', '--enable-gpu-rasterization'] });
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 page.on('console', (message) => message.type() === 'error' && console.error('console error:', message.text()));
 page.on('pageerror', (error) => console.error('page error:', error.message));

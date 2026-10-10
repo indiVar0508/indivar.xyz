@@ -9,9 +9,10 @@ export function App() {
   return (
     <div className="stage">
       <Canvas
+        flat
         shadows
         dpr={quality === 'high' ? [1, 2] : [1, 1.5]}
-        gl={{ antialias: true, powerPreference: 'high-performance', preserveDrawingBuffer: QA }}
+        gl={{ antialias: false, powerPreference: 'high-performance', preserveDrawingBuffer: QA }}
         camera={{ position: [5.4, 1.55, 5.2], fov: 35, near: 0.05, far: 60 }}
       >
         <Suspense fallback={null}>
