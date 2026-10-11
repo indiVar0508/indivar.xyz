@@ -2,7 +2,8 @@ import { MathUtils } from 'three';
 import type { CarTopicId } from '../content/car';
 import type { EngineTopicId } from '../content/engine';
 import { ENGINE_ANCHORS } from '../engine/anchors';
-import { add, dot, normalize, scale, sub, type Vec3 } from '../math';
+import { ROOM } from '../scene/layout';
+import { add, dot, length, normalize, scale, sub, type Vec3 } from '../math';
 import type { View } from '../state/view';
 
 export type Shot = { position: Vec3; target: Vec3 };
@@ -104,4 +105,45 @@ export function segmentHitsHood(from: Vec3, to: Vec3, panel: typeof HOOD_PANEL, 
     if (v >= 0 && v <= 1 && Math.abs(local[0]) <= Math.max(a[2], b[2])) return true;
   }
   return false;
+}
+
+/** Where the camera may be: inside the room with a margin, above the floor, below the ceiling beams. */
+export const CAMERA_BOUNDS = {
+  min: [-ROOM.halfWidth + 0.4, 0.25, ROOM.back + 0.4] as Vec3,
+  max: [ROOM.halfWidth - 0.4, ROOM.height - 0.35, ROOM.front - 0.4] as Vec3,
+};
+
+export type OrbitLimits = { minAzimuth: number; maxAzimuth: number; minPolar: number; maxPolar: number; minDistance: number; maxDistance: number };
+
+/**
+ * Orbit freedom around each kind of shot (radians): ± azimuth, how far the camera may rise (`up`) or sink (`down`),
+ * and the distance range as multiples of the shot's. Engine shots sit just above the body, so they may only rise
+ * and back away; they are already as close as the bay allows.
+ */
+const ORBIT_FREEDOM = {
+  focus: { azimuth: 0.5, up: 0.3, down: 0.3, nearer: 0.75, farther: 1.5 },
+  bay: { azimuth: 0.4, up: 0.25, down: 0.15, nearer: 0.8, farther: 1.4 },
+  'bay-part': { azimuth: 0.3, up: 0.06, down: 0, nearer: 1, farther: 1.3 },
+} as const;
+
+/**
+ * How far the visitor may orbit and zoom from a view's shot. The showroom orbits freely but never closer than 3 m,
+ * which keeps the camera outside the car; every other view keeps the camera near its shot, so it can't swing
+ * through the body or the open hood. The room itself is enforced separately with CAMERA_BOUNDS.
+ */
+export function orbitLimits(view: View, shot: Shot): OrbitLimits {
+  if (view.kind === 'showroom') return { minAzimuth: -Infinity, maxAzimuth: Infinity, minPolar: 0.35, maxPolar: 1.45, minDistance: 3, maxDistance: 7.5 };
+  const freedom = ORBIT_FREEDOM[view.kind];
+  const offset = sub(shot.position, shot.target);
+  const distance = length(offset);
+  const azimuth = Math.atan2(offset[0], offset[2]);
+  const polar = Math.acos(offset[1] / distance);
+  return {
+    minAzimuth: azimuth - freedom.azimuth,
+    maxAzimuth: azimuth + freedom.azimuth,
+    minPolar: Math.max(0.2, polar - freedom.up),
+    maxPolar: Math.min(1.48, polar + freedom.down),
+    minDistance: distance * freedom.nearer,
+    maxDistance: Math.min(7.5, distance * freedom.farther),
+  };
 }

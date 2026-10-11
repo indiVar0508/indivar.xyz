@@ -5,8 +5,9 @@ import { ENGINE_TOPIC_IDS } from '../content/engine';
 import { BAY, ENGINE_ANCHORS, RADIATOR } from '../engine/anchors';
 import { add, type Vec3 } from '../math';
 import { ROOM } from '../scene/layout';
-import { CAR_SHOTS, CAR_SOLIDS, CAMERA_FOV, engineOrigin, engineShot, fovFor, HOOD_PANEL, insideSolid, segmentHitsHood, shotFor } from './shots';
+import { CAMERA_BOUNDS, CAR_SHOTS, CAR_SOLIDS, CAMERA_FOV, orbitLimits, engineOrigin, engineShot, fovFor, HOOD_PANEL, insideSolid, segmentHitsHood, shotFor } from './shots';
 import { HOOD_OPEN_DEG } from './hood';
+import { isHoodOpen, SHOWROOM, type View } from '../state/view';
 
 const EXPECTED_BAY: Vec3 = [0, 0.3133, 1.4806]; // prepare-report.json engineBay
 const open = MathUtils.degToRad(HOOD_OPEN_DEG);
@@ -84,6 +85,64 @@ describe('engine anchors', () => {
       expect(z, id).toBeGreaterThan(BAY.rearZ);
       expect(z, id).toBeLessThan(BAY.frontZ);
       expect(y, id).toBeGreaterThan(BAY.floorY);
+    }
+  });
+});
+
+/** Where camera-controls puts the camera for a target and spherical offset, pulled in toward the target to stay in bounds. */
+function orbitPosition(target: Vec3, azimuth: number, polar: number, distance: number): Vec3 {
+  const offset: Vec3 = [distance * Math.sin(polar) * Math.sin(azimuth), distance * Math.cos(polar), distance * Math.sin(polar) * Math.cos(azimuth)];
+  let scaleBy = 1;
+  for (let axis = 0; axis < 3; axis++) {
+    const end = target[axis]! + offset[axis]!;
+    if (end > CAMERA_BOUNDS.max[axis]!) scaleBy = Math.min(scaleBy, (CAMERA_BOUNDS.max[axis]! - target[axis]!) / offset[axis]!);
+    if (end < CAMERA_BOUNDS.min[axis]!) scaleBy = Math.min(scaleBy, (CAMERA_BOUNDS.min[axis]! - target[axis]!) / offset[axis]!);
+  }
+  return add(target, [offset[0] * scaleBy, offset[1] * scaleBy, offset[2] * scaleBy]);
+}
+
+describe('orbit limits', () => {
+  const views: View[] = [
+    SHOWROOM,
+    ...CAR_TOPIC_IDS.filter((id) => id !== 'hood').map((id) => ({ kind: 'focus', id }) as View),
+    { kind: 'bay' },
+    ...ENGINE_TOPIC_IDS.map((id) => ({ kind: 'bay-part', id }) as View),
+  ];
+
+  it('never lets the visitor orbit or zoom the camera into the car, or through the open hood', () => {
+    for (const view of views) {
+      const shot = shotFor(view, EXPECTED_BAY);
+      const limits = orbitLimits(view, shot);
+      const azimuths = Number.isFinite(limits.minAzimuth)
+        ? [limits.minAzimuth, (limits.minAzimuth + limits.maxAzimuth) / 2, limits.maxAzimuth]
+        : Array.from({ length: 24 }, (_, i) => (i / 24) * 2 * Math.PI);
+      for (const azimuth of azimuths) {
+        for (const polar of [limits.minPolar, (limits.minPolar + limits.maxPolar) / 2, limits.maxPolar]) {
+          for (const distance of [limits.minDistance, limits.maxDistance]) {
+            const camera = orbitPosition(shot.target, azimuth, polar, distance);
+            const label = `${JSON.stringify(view)} az ${azimuth.toFixed(2)} pol ${polar.toFixed(2)} d ${distance.toFixed(2)} → ${camera.map((v) => v.toFixed(2))}`;
+            expect(insideSolid(camera), label).toBe(false);
+            if (isHoodOpen(view)) expect(segmentHitsHood(camera, shot.target, HOOD_PANEL, open), label).toBe(false);
+          }
+        }
+      }
+    }
+  });
+
+  it('includes each view’s own shot', () => {
+    for (const view of views) {
+      const shot = shotFor(view, EXPECTED_BAY);
+      const limits = orbitLimits(view, shot);
+      const [dx, dy, dz] = [0, 1, 2].map((axis) => shot.position[axis]! - shot.target[axis]!) as Vec3;
+      const distance = Math.hypot(dx, dy, dz);
+      const azimuth = Math.atan2(dx, dz);
+      const polar = Math.acos(dy / distance);
+      expect(azimuth, JSON.stringify(view)).toBeGreaterThanOrEqual(limits.minAzimuth);
+      expect(azimuth, JSON.stringify(view)).toBeLessThanOrEqual(limits.maxAzimuth);
+      expect(polar, JSON.stringify(view)).toBeGreaterThanOrEqual(limits.minPolar);
+      expect(polar, JSON.stringify(view)).toBeLessThanOrEqual(limits.maxPolar);
+      expect(distance, JSON.stringify(view)).toBeGreaterThanOrEqual(limits.minDistance);
+      expect(distance, JSON.stringify(view)).toBeLessThanOrEqual(limits.maxDistance + 0.1);
     }
   });
 });

@@ -143,6 +143,25 @@ test('rejects a file it can’t play', async ({ page }) => {
   expect(errors.filter((e) => !/NotSupportedError|no supported source/i.test(e))).toEqual([]);
 });
 
+test('keeps the camera out of the car and inside the room', async ({ page }, info) => {
+  test.skip(info.project.name !== 'desktop', 'mouse wheel and drag');
+  await open(page);
+  await page.mouse.move(720, 450);
+  for (let i = 0; i < 40; i++) await page.mouse.wheel(0, -400);
+  await page.waitForTimeout(1500);
+  const [x, y, z] = await cameraPosition(page);
+  expect(Math.hypot(x!, y! - 0.55, z!)).toBeGreaterThan(2.9); // the showroom target is [0, 0.55, 0]
+  await page.mouse.down();
+  await page.mouse.move(720, 900, { steps: 20 });
+  await page.mouse.up();
+  for (let i = 0; i < 40; i++) await page.mouse.wheel(0, 400);
+  await page.waitForTimeout(1500);
+  const camera = await cameraPosition(page);
+  expect(camera[1]).toBeLessThan(4.4); // below the ceiling
+  expect(Math.abs(camera[0]!)).toBeLessThan(8.5);
+  expect(camera[2]).toBeGreaterThan(-7.5);
+});
+
 test.describe('reduced motion', () => {
   test.use({ reducedMotion: 'reduce' });
 

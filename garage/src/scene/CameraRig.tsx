@@ -1,8 +1,8 @@
-import { CameraControls } from '@react-three/drei';
+import { CameraControls, CameraControlsImpl } from '@react-three/drei';
 import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useMemo, useRef, type ComponentRef } from 'react';
-import { PerspectiveCamera } from 'three';
-import { fovFor, shotFor } from '../car/shots';
+import { Box3, PerspectiveCamera, Vector3 } from 'three';
+import { CAMERA_BOUNDS, fovFor, orbitLimits, shotFor } from '../car/shots';
 import type { Vec3 } from '../math';
 import { QA } from '../qa';
 import { useGarage } from '../state/store';
@@ -24,14 +24,31 @@ export function CameraRig({ bay }: { bay: Vec3 }) {
   }, [camera, size]);
 
   useEffect(() => {
-    const { position: p, target: t } = shotFor(view, bay);
-    void controls.current?.setLookAt(p[0], p[1], p[2], t[0], t[1], t[2], !reducedMotion);
+    const rig = controls.current;
+    if (!rig) return;
+    const shot = shotFor(view, bay);
+    const limits = orbitLimits(view, shot);
+    rig.minAzimuthAngle = limits.minAzimuth;
+    rig.maxAzimuthAngle = limits.maxAzimuth;
+    rig.minPolarAngle = limits.minPolar;
+    rig.maxPolarAngle = limits.maxPolar;
+    rig.minDistance = limits.minDistance;
+    rig.maxDistance = limits.maxDistance;
+    const { position: p, target: t } = shot;
+    void rig.setLookAt(p[0], p[1], p[2], t[0], t[1], t[2], !reducedMotion);
+    rig.normalizeRotations(); // after a long drift, turn the short way round to the new shot
     timer.idle = 0;
   }, [view, bay, reducedMotion]);
 
   useEffect(() => {
     const rig = controls.current;
     if (!rig) return;
+    // Keep the camera in the room, and leave the target to the shots: no panning by mouse or touch.
+    rig.setBoundary(new Box3(new Vector3(...CAMERA_BOUNDS.min), new Vector3(...CAMERA_BOUNDS.max)));
+    rig.boundaryEnclosesCamera = true;
+    rig.mouseButtons.right = CameraControlsImpl.ACTION.NONE;
+    rig.touches.two = CameraControlsImpl.ACTION.TOUCH_DOLLY;
+    rig.touches.three = CameraControlsImpl.ACTION.NONE;
     const takeOver = () => {
       timer.idle = -Infinity; // the visitor is driving; no drift until the next return to the showroom
     };
@@ -54,10 +71,6 @@ export function CameraRig({ bay }: { bay: Vec3 }) {
     <CameraControls
       ref={controls}
       makeDefault
-      minDistance={1.1}
-      maxDistance={7.5}
-      minPolarAngle={0.25}
-      maxPolarAngle={1.48}
       smoothTime={0.55}
       draggingSmoothTime={0.12}
     />
