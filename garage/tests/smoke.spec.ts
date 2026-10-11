@@ -127,6 +127,14 @@ test('falls back without WebGL 2', async ({ page }) => {
   await expect(page.getByRole('link', { name: 'Back to indivar.xyz' })).toBeVisible();
 });
 
+test('explains a failed load instead of showing an empty page', async ({ page }) => {
+  await page.route('**/models/m3-gtr.glb', (route) => route.fulfill({ status: 404, body: 'missing' }));
+  await page.goto('./?qa');
+  await expect(page.getByRole('alert')).toContainText('Couldn’t load the garage', { timeout: 60_000 });
+  await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Back to indivar.xyz' })).toBeVisible();
+});
+
 test('rejects a file it can’t play', async ({ page }) => {
   const errors = await open(page);
   await page.locator('input[type=file]').setInputFiles({ name: 'not-audio.mp3', mimeType: 'audio/mpeg', buffer: Buffer.from('this is not audio') });

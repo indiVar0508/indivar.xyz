@@ -9,6 +9,7 @@ import { App } from './App';
 import { bindAudio } from './audio/bindings';
 import { QA } from './qa';
 import { useGarage } from './state/store';
+import { ErrorBoundary } from './ui/ErrorBoundary';
 import { Fallback } from './ui/Fallback';
 import { supportsWebGL2 } from './webgl';
 
@@ -17,4 +18,14 @@ if (QA) Object.assign(window, { garage: useGarage });
 bindAudio();
 
 const root = createRoot(document.getElementById('app')!);
-root.render(<StrictMode>{supportsWebGL2() ? <App /> : <Fallback />}</StrictMode>);
+root.render(
+  <StrictMode>
+    {supportsWebGL2() ? (
+      <ErrorBoundary>
+        <App />
+      </ErrorBoundary>
+    ) : (
+      <Fallback />
+    )}
+  </StrictMode>,
+);
