@@ -22,9 +22,9 @@ const isOnTop = (page: Page, selector: string) =>
     return hit !== null && element.contains(hit);
   });
 
-test('renders the garage', async ({ page }, info) => {
-  const errors = await open(page);
-  const variance = await page.evaluate(() => {
+/** Luma variance of the canvas, downsampled: a blank or single-colour frame scores near zero. */
+const canvasVariance = (page: Page) =>
+  page.evaluate(() => {
     const source = document.querySelector('canvas')!;
     const canvas = document.createElement('canvas');
     canvas.width = 64;
@@ -42,9 +42,20 @@ test('renders the garage', async ({ page }, info) => {
     const n = data.length / 4;
     return squares / n - (sum / n) ** 2;
   });
-  expect(variance).toBeGreaterThan(40);
+
+test('renders the garage', async ({ page }, info) => {
+  const errors = await open(page);
+  expect(await canvasVariance(page)).toBeGreaterThan(40);
   await expect(page.locator('h1')).toHaveCount(1);
   await page.screenshot({ path: info.outputPath('showroom.png') });
+  expect(errors).toEqual([]);
+});
+
+test('renders the garage at low quality, the tier phones get', async ({ page }, info) => {
+  const errors = await open(page, '?qa&quality=low');
+  expect(await page.evaluate(() => (window as unknown as { garage: { getState(): { quality: string } } }).garage.getState().quality)).toBe('low');
+  expect(await canvasVariance(page)).toBeGreaterThan(40);
+  await page.screenshot({ path: info.outputPath('showroom-low.png') });
   expect(errors).toEqual([]);
 });
 
