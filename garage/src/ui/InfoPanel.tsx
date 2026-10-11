@@ -12,14 +12,26 @@ function PanelBody({ topic, eyebrow, hint }: { topic: Topic; eyebrow: string; hi
   const back = () => useGarage.getState().dispatch({ type: 'back' });
   const panel = useRef<HTMLElement>(null);
 
-  // Publishes the panel's height so the phone layout can seat the HUD buttons right above the bottom sheet.
+  // Publishes the panel's height so the phone layout can seat the HUD buttons right above the bottom sheet, and
+  // tells the camera how much of the canvas the sheet and buttons cover, so it can frame the subject above them.
   useLayoutEffect(() => {
     const root = document.documentElement.style;
-    const observer = new ResizeObserver(([entry]) => root.setProperty('--panel-height', `${entry!.borderBoxSize[0]!.blockSize}px`));
+    const { setCoveredBottom } = useGarage.getState();
+    const actions = document.querySelector('.hud-actions');
+    const measure = () => {
+      const sheet = panel.current!.getBoundingClientRect();
+      root.setProperty('--panel-height', `${sheet.height}px`);
+      const phone = matchMedia('(max-width: 720px)').matches;
+      const top = actions?.getBoundingClientRect().top ?? sheet.top;
+      setCoveredBottom(phone ? Math.max(0, innerHeight - top) : 0);
+    };
+    const observer = new ResizeObserver(measure);
     observer.observe(panel.current!);
+    if (actions) observer.observe(actions);
     return () => {
       observer.disconnect();
       root.removeProperty('--panel-height');
+      setCoveredBottom(0);
     };
   }, []);
   const facts = (

@@ -97,6 +97,27 @@ test('phone layout keeps the car visible', async ({ page }, info) => {
   await page.screenshot({ path: info.outputPath('phone-wheels.png') });
 });
 
+test('lets a phone visitor tap every engine part', async ({ page }, info) => {
+  test.skip(info.project.name !== 'phone', 'phone only');
+  await open(page);
+  await page.getByRole('button', { name: 'Open the hood' }).tap();
+  await expect(page.getByRole('heading', { level: 2, name: 'P60B40 V8' })).toBeVisible();
+  await page.waitForTimeout(2500); // let the camera arrive
+  const reachable = await page.evaluate(() =>
+    [...document.querySelectorAll<HTMLElement>('.hotspot-holder')]
+      .filter((holder) => Number(getComputedStyle(holder).opacity) > 0.2) // markers facing away are hidden by design
+      .map((holder) => {
+        const button = holder.querySelector('button')!;
+        const box = button.getBoundingClientRect();
+        const hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
+        return { name: button.textContent, tappable: hit !== null && button.contains(hit) };
+      }),
+  );
+  expect(reachable.length).toBeGreaterThanOrEqual(5);
+  await page.screenshot({ path: info.outputPath('phone-bay.png') });
+  expect(reachable.filter((hotspot) => !hotspot.tappable)).toEqual([]);
+});
+
 test('keeps hotspots under the info panel', async ({ page }, info) => {
   test.skip(info.project.name !== 'desktop', 'desktop layout');
   await open(page);

@@ -13,12 +13,15 @@ export type GarageStore = {
   soundOn: boolean;
   ownTrack: string | null;
   trackError: string | null;
+  /** Pixels at the bottom of the canvas hidden by the phone bottom sheet and its buttons; the camera frames above them. */
+  coveredBottom: number;
   dispatch: (action: ViewAction) => void;
   setQuality: (quality: Quality) => void;
   setReady: () => void;
   setSound: (on: boolean) => void;
   setOwnTrack: (name: string | null) => void;
   setTrackError: (message: string | null) => void;
+  setCoveredBottom: (pixels: number) => void;
 };
 
 const inBrowser = typeof window !== 'undefined';
@@ -33,6 +36,7 @@ export const useGarage = create<GarageStore>()((set) => ({
   soundOn: false,
   ownTrack: null,
   trackError: null,
+  coveredBottom: 0,
   dispatch: (action) =>
     set((state) => {
       const view = reduceView(state.view, action);
@@ -43,4 +47,5 @@ export const useGarage = create<GarageStore>()((set) => ({
   setSound: (soundOn) => set({ soundOn }),
   setOwnTrack: (ownTrack) => set({ ownTrack }),
   setTrackError: (trackError) => set({ trackError }),
+  setCoveredBottom: (coveredBottom) => set({ coveredBottom }),
 }));

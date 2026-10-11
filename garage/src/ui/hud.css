@@ -50,4 +50,7 @@
   /* The panel is a bottom sheet here: lift the buttons above it, and hide the credits until it closes. */
   body:has(.panel) .hud-actions { bottom: calc(var(--panel-height, 46vh) + 10px); }
   body:has(.panel) .credits { display: none; }
+  /* Engine markers crowd together on a small screen: a 28 px target (WCAG 2.5.8 asks for 24) keeps each tap on its own marker. */
+  .hotspot { width: 28px; height: 28px; }
+  .hotspot-label { left: 30px; }
 }
