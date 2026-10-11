@@ -12,12 +12,17 @@ type Props = { position: Vec3; normal: Vec3; label: string; summary: string; sel
 export function Hotspot({ position, normal, label, summary, selected = false, onSelect }: Props) {
   const group = useRef<Group>(null);
   const holder = useRef<HTMLDivElement>(null);
+  const shown = useRef(-1);
   const world = useMemo(() => new Vector3(), []);
+  const scratch = useMemo(() => new Vector3(), []);
+  const facing = useMemo(() => new Vector3(...normal).normalize(), [normal]);
   useFrame(({ camera }) => {
     if (!group.current || !holder.current) return;
     group.current.getWorldPosition(world);
-    const opacity = facingOpacity(world.toArray(), normal, camera.position.toArray());
-    holder.current.style.opacity = opacity.toFixed(2);
+    const opacity = Math.round(facingOpacity(world, facing, camera.position, scratch) * 20) / 20;
+    if (opacity === shown.current) return; // touch the DOM only when the 5% step changes
+    shown.current = opacity;
+    holder.current.style.opacity = String(opacity);
     holder.current.style.pointerEvents = opacity > 0.2 ? 'auto' : 'none';
   });
   return (

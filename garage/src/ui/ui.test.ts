@@ -1,3 +1,4 @@
+import { Vector3 } from 'three';
 import { describe, expect, it } from 'vitest';
 import { carHotspot } from '../car/hotspots';
 import type { CarAnchors } from '../car/prepareCar';
@@ -9,10 +10,14 @@ import { SHOWROOM } from '../state/view';
 const anchors: CarAnchors = { wheelFL: [0.8, 0.32, 1.45], wheelFR: [-0.8, 0.32, 1.45], wheelRL: [0.8, 0.32, -1.21], wheelRR: [-0.8, 0.32, -1.21], engineBay: [0, 0.32, 1.49] };
 
 describe('facingOpacity', () => {
+  // Runs every frame for every hotspot, so it takes Vector3s and a scratch vector instead of allocating (spec §7).
+  const scratch = new Vector3();
+  const at = (x: number, y: number, z: number) => new Vector3(x, y, z);
+
   it('shows hotspots facing the camera and hides those facing away', () => {
-    expect(facingOpacity([1, 0, 0], [1, 0, 0], [5, 0, 0])).toBe(1);
-    expect(facingOpacity([1, 0, 0], [1, 0, 0], [-5, 0, 0])).toBe(0);
-    const grazing = facingOpacity([1, 0, 0], [1, 0, 0], [1, 0, 5]);
+    expect(facingOpacity(at(1, 0, 0), at(1, 0, 0), at(5, 0, 0), scratch)).toBe(1);
+    expect(facingOpacity(at(1, 0, 0), at(1, 0, 0), at(-5, 0, 0), scratch)).toBe(0);
+    const grazing = facingOpacity(at(1, 0, 0), at(1, 0, 0), at(1, 0, 5), scratch);
     expect(grazing).toBeGreaterThan(0);
     expect(grazing).toBeLessThan(1);
   });

@@ -1,6 +1,6 @@
 import { CameraControls } from '@react-three/drei';
 import { useFrame, useThree } from '@react-three/fiber';
-import { useEffect, useRef, type ComponentRef } from 'react';
+import { useEffect, useMemo, useRef, type ComponentRef } from 'react';
 import { PerspectiveCamera } from 'three';
 import { fovFor, shotFor } from '../car/shots';
 import type { Vec3 } from '../math';
@@ -15,7 +15,7 @@ export function CameraRig({ bay }: { bay: Vec3 }) {
   const reducedMotion = useGarage((state) => state.reducedMotion);
   const camera = useThree((state) => state.camera);
   const size = useThree((state) => state.size);
-  const idle = useRef(0);
+  const timer = useMemo(() => ({ idle: 0 }), []);
 
   useEffect(() => {
     if (!(camera instanceof PerspectiveCamera)) return;
@@ -26,14 +26,14 @@ export function CameraRig({ bay }: { bay: Vec3 }) {
   useEffect(() => {
     const { position: p, target: t } = shotFor(view, bay);
     void controls.current?.setLookAt(p[0], p[1], p[2], t[0], t[1], t[2], !reducedMotion);
-    idle.current = 0;
+    timer.idle = 0;
   }, [view, bay, reducedMotion]);
 
   useEffect(() => {
     const rig = controls.current;
     if (!rig) return;
     const takeOver = () => {
-      idle.current = -Infinity; // the visitor is driving; no drift until the next return to the showroom
+      timer.idle = -Infinity; // the visitor is driving; no drift until the next return to the showroom
     };
     rig.addEventListener('controlstart', takeOver);
     return () => rig.removeEventListener('controlstart', takeOver);
@@ -46,9 +46,8 @@ export function CameraRig({ bay }: { bay: Vec3 }) {
 
   useFrame((_, dt) => {
     if (reducedMotion || view.kind !== 'showroom' || !controls.current) return;
-    const drift = stepDrift(idle.current, dt);
-    idle.current = drift.idle;
-    if (drift.angle > 0) void controls.current.rotate(drift.angle, 0, false);
+    const angle = stepDrift(timer, dt);
+    if (angle > 0) controls.current.azimuthAngle += angle; // a plain setter: rotate() would allocate a promise per frame
   });
 
   return (
