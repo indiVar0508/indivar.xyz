@@ -1,9 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useGarage } from '../state/store';
 import { SHOWROOM } from '../state/view';
+import { station } from '../music/station';
+import { audio } from './controller';
 import { bindAudio } from './bindings';
 
-vi.mock('./controller', () => ({ audio: { setEnabled: vi.fn(async () => undefined), sfx: vi.fn() } }));
+vi.mock('./controller', () => ({ audio: { setEnabled: vi.fn(async () => undefined), sfx: vi.fn(), clearOwnTrack: vi.fn(), setRadioPlaying: vi.fn() } }));
+vi.mock('../music/station', () => ({ station: { pause: vi.fn() } }));
 
 let target: EventTarget;
 const gesture = (type: 'pointerup' | 'keydown', on?: { closest: (selector: string) => unknown }, key = 'Enter') => {
@@ -44,5 +47,43 @@ describe('bindAudio with sound remembered as on', () => {
     useGarage.getState().setSound(false);
     gesture('keydown');
     expect(useGarage.getState().soundOn).toBe(false);
+  });
+});
+
+describe('bindAudio with the Most Wanted radio', () => {
+  beforeEach(() => {
+    target = new EventTarget();
+    Object.assign(globalThis, { window: target, localStorage: { getItem: () => 'off', setItem: () => undefined } });
+    useGarage.setState({ view: SHOWROOM, soundOn: false, ownTrack: null, radioOpen: false, radio: { track: 0, status: 'loading' } });
+    vi.clearAllMocks();
+    bindAudio();
+  });
+
+  it('turns garage sound on when the radio opens, and stops the visitor’s own track', () => {
+    useGarage.setState({ ownTrack: 'mine.mp3' });
+    useGarage.getState().setRadioOpen(true);
+    expect(useGarage.getState().soundOn).toBe(true);
+    expect(useGarage.getState().ownTrack).toBeNull();
+    expect(audio.clearOwnTrack).toHaveBeenCalled();
+  });
+
+  it('closes the radio when the visitor picks their own track', () => {
+    useGarage.getState().setRadioOpen(true);
+    useGarage.getState().setOwnTrack('mine.mp3');
+    expect(useGarage.getState().radioOpen).toBe(false);
+  });
+
+  it('pauses the radio when sound is turned off', () => {
+    useGarage.getState().setRadioOpen(true);
+    useGarage.getState().setSound(false);
+    expect(station.pause).toHaveBeenCalled();
+  });
+
+  it('ducks the garage ambience only while the radio is open and playing', () => {
+    useGarage.getState().setRadioOpen(true);
+    useGarage.getState().setRadio({ track: 0, status: 'playing' });
+    expect(audio.setRadioPlaying).toHaveBeenLastCalledWith(true);
+    useGarage.getState().setRadioOpen(false);
+    expect(audio.setRadioPlaying).toHaveBeenLastCalledWith(false);
   });
 });

@@ -71,8 +71,8 @@ export class Ambience {
     setTimeout(() => this.out.disconnect(), 1500);
   }
 
-  setDuck(ownTrackPlaying: boolean): void {
-    this.out.gain.setTargetAtTime(LEVEL * duckLevel(ownTrackPlaying), this.ctx.currentTime, 0.4);
+  setDuck(musicPlaying: boolean): void {
+    this.out.gain.setTargetAtTime(LEVEL * duckLevel(musicPlaying), this.ctx.currentTime, 0.4);
   }
 
   private tick(): void {

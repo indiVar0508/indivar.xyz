@@ -18,15 +18,17 @@ export function CameraRig({ bay }: { bay: Vec3 }) {
   const timer = useMemo(() => ({ idle: 0 }), []);
 
   const coveredBottom = useGarage((state) => state.coveredBottom);
+  const coveredTop = useGarage((state) => state.coveredTop);
 
   useEffect(() => {
     if (!(camera instanceof PerspectiveCamera)) return;
     camera.fov = fovFor(size.width / size.height);
-    // Shift the picture up by half the covered strip, so each shot's subject sits in the middle of what's visible.
-    if (coveredBottom > 0) camera.setViewOffset(size.width, size.height, 0, coveredBottom / 2, size.width, size.height);
+    // Shift the picture by half of each covered strip, so each shot's subject sits in the middle of what's visible.
+    const shift = (coveredBottom - coveredTop) / 2;
+    if (shift !== 0) camera.setViewOffset(size.width, size.height, 0, shift, size.width, size.height);
     else camera.clearViewOffset();
     camera.updateProjectionMatrix();
-  }, [camera, size, coveredBottom]);
+  }, [camera, size, coveredBottom, coveredTop]);
 
   useEffect(() => {
     const rig = controls.current;

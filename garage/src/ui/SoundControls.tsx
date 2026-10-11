@@ -6,7 +6,8 @@ export function SoundControls() {
   const soundOn = useGarage((state) => state.soundOn);
   const ownTrack = useGarage((state) => state.ownTrack);
   const trackError = useGarage((state) => state.trackError);
-  const { setSound, setOwnTrack, setTrackError } = useGarage.getState();
+  const radioOpen = useGarage((state) => state.radioOpen);
+  const { setSound, setOwnTrack, setTrackError, setRadioOpen } = useGarage.getState();
   const input = useRef<HTMLInputElement>(null);
 
   const pick = async (file: File) => {
@@ -25,6 +26,9 @@ export function SoundControls() {
     <>
       <button type="button" className="hud-button" data-sound-toggle aria-pressed={soundOn} onClick={() => setSound(!soundOn)}>
         {soundOn ? 'Sound on' : 'Sound off'}
+      </button>
+      <button type="button" className="hud-button" aria-pressed={radioOpen} onClick={() => setRadioOpen(!radioOpen)}>
+        Most Wanted radio
       </button>
       <button type="button" className="hud-button" onClick={() => input.current?.click()}>
         {ownTrack ? 'Change track' : 'Play my own track'}

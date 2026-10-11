@@ -8,6 +8,7 @@ class AudioController {
   private ambience: Ambience | null = null;
   private track: HTMLAudioElement | null = null;
   private trackUrl: string | null = null;
+  private radioPlaying = false;
 
   async setEnabled(on: boolean): Promise<void> {
     if (!on) {
@@ -28,7 +29,17 @@ class AudioController {
       this.ambience.start();
     }
     if (this.track) await this.track.play().catch(() => undefined);
-    this.ambience.setDuck(this.track !== null && !this.track.paused);
+    this.duck();
+  }
+
+  /** The Most Wanted radio plays in YouTube's player, outside this context, so it only reports in to duck the room. */
+  setRadioPlaying(playing: boolean): void {
+    this.radioPlaying = playing;
+    this.duck();
+  }
+
+  private duck(): void {
+    this.ambience?.setDuck(this.radioPlaying || (this.track !== null && !this.track.paused));
   }
 
   sfx(kind: 'hood' | 'tick'): void {
@@ -50,7 +61,7 @@ class AudioController {
     }
     this.track = track;
     this.trackUrl = url;
-    this.ambience?.setDuck(true);
+    this.duck();
   }
 
   clearOwnTrack(): void {
@@ -58,7 +69,7 @@ class AudioController {
     if (this.trackUrl) URL.revokeObjectURL(this.trackUrl);
     this.track = null;
     this.trackUrl = null;
-    this.ambience?.setDuck(false);
+    this.duck();
   }
 }
 

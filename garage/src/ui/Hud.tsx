@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useGarage } from '../state/store';
 import { isHoodOpen } from '../state/view';
 import { InfoPanel } from './InfoPanel';
+import { RadioDock } from './RadioDock';
 import { SoundControls } from './SoundControls';
 import { breadcrumbFor } from './topicFor';
 
@@ -38,6 +39,7 @@ export function Hud() {
       </div>
       <p className="hint">Drag to orbit · Pick a marker · Esc to go back</p>
       <InfoPanel />
+      <RadioDock />
     </>
   );
 }

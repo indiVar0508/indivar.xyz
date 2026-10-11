@@ -11,7 +11,7 @@ export const BAR_SECONDS = 8;
 export const chordAt = (seconds: number): readonly number[] => CHORDS[Math.floor(seconds / BAR_SECONDS) % CHORDS.length]!;
 
 /** Ambience gain while the visitor's own track plays. */
-export const duckLevel = (ownTrackPlaying: boolean): number => (ownTrackPlaying ? 0.2 : 1);
+export const duckLevel = (musicPlaying: boolean): number => (musicPlaying ? 0.2 : 1);
 
 /** Slow 0..1 swell for distant traffic. */
 export const swell = (seconds: number, period = 23): number => 0.5 - 0.5 * Math.cos((2 * Math.PI * seconds) / period);
