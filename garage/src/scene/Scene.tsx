@@ -16,6 +16,7 @@ import { Lighting } from './Lighting';
 import { ReadySignal } from './ReadySignal';
 
 export function Scene() {
+  const reducedMotion = useGarage((state) => state.reducedMotion);
   return (
     <>
       <color attach="background" args={['#05070a']} />
@@ -45,7 +46,7 @@ export function Scene() {
         )}
       </Car>
       <ContactShadows position={[0, 0.005, 0]} scale={9} resolution={1024} far={1.6} blur={2.4} opacity={0.8} frames={1} />
-      <Sparkles count={70} scale={[12, 3.5, 12]} position={[0, 1.8, 0]} size={1.6} speed={0.12} opacity={0.22} color="#ffd9a6" />
+      <Sparkles count={70} scale={[12, 3.5, 12]} position={[0, 1.8, 0]} size={1.6} speed={reducedMotion ? 0 : 0.12} opacity={0.22} color="#ffd9a6" />
       <Effects />
       <FrameMonitor />
       <ReadySignal />

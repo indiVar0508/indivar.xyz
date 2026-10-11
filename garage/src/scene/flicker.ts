@@ -2,7 +2,8 @@ import { mulberry32 } from '../random';
 
 const PERIOD = 6;
 const STUTTER = 1.1;
-const BLINK = 0.07;
+/** Slot length (s). At 0.2 s the tube changes at most six times a second: three flashes, the WCAG 2.3.1 limit. */
+const BLINK = 0.2;
 
 /** Brightness 0..1 for a failing fluorescent tube: mostly on, with one seeded stutter every few seconds. */
 export function flickerLevel(t: number, seed = 7): number {

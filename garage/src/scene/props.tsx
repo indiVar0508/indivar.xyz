@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber';
 import { useLayoutEffect, useMemo, useRef } from 'react';
 import { DoubleSide, Matrix4, PlaneGeometry, type InstancedMesh, type MeshStandardMaterial, type PointLight, type Texture } from 'three';
 import type { Vec3 } from '../math';
+import { useGarage } from '../state/store';
 import { flickerLevel } from './flicker';
 
 type Placed = { position: Vec3; rotationY?: number };
@@ -15,8 +16,9 @@ const frame = { color: '#2a2d31', metalness: 0.7, roughness: 0.5 } as const;
 export function HangingTube({ position, flicker = false }: { position: Vec3; flicker?: boolean }) {
   const glow = useRef<MeshStandardMaterial>(null);
   const light = useRef<PointLight>(null);
+  const reducedMotion = useGarage((state) => state.reducedMotion);
   useFrame(({ clock }) => {
-    if (!flicker) return;
+    if (!flicker || reducedMotion) return; // under reduced motion the tube simply stays on
     const level = flickerLevel(clock.elapsedTime);
     if (glow.current) glow.current.emissiveIntensity = TUBE_GLOW * level;
     if (light.current) light.current.intensity = TUBE_LIGHT * level;
