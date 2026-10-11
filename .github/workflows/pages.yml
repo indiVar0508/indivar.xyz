@@ -21,12 +21,21 @@ jobs:
         with:
           ruby-version: '3.3'
           bundler-cache: true
-      - name: Build site
-        run: bundle exec jekyll build --trace
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: garage/package-lock.json
+      - name: Install garage dependencies
+        run: npm ci
+        working-directory: garage
+      - name: Test garage
+        run: npm test
+        working-directory: garage
+      - name: Build site and garage, then check pages and links
+        run: scripts/build-site.sh
         env:
           JEKYLL_ENV: production
-      - name: Check generated pages and links
-        run: ruby test_site.rb
       - uses: actions/upload-pages-artifact@v4
         with:
           path: _site

@@ -1,0 +1,33 @@
+:root {
+  --ink: #e8ecf2;
+  --muted: #8d97a6;
+  --panel: rgba(9, 13, 19, 0.76);
+  --line: rgba(201, 206, 214, 0.2);
+  --blue: #3d7bff;
+  --navy: #1c3f94;
+  --silver: #c9ced6;
+  --amber: #ffb35c;
+  --font: 'Saira Condensed', 'Arial Narrow', sans-serif;
+  --mono: 'PT Mono', ui-monospace, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: #07090c; color: var(--ink); font: 16px/1.5 var(--font); -webkit-font-smoothing: antialiased; }
+body { overflow: hidden; }
+a { color: inherit; }
+:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
+.skip-link { position: fixed; top: -100px; left: 16px; z-index: 50; padding: 8px 14px; background: var(--ink); color: #07090c; }
+.skip-link:focus { top: 12px; }
+#main { position: fixed; inset: 0; outline: none; }
+#app, .stage { position: absolute; inset: 0; }
+.masthead { position: absolute; z-index: 10; top: max(16px, env(safe-area-inset-top)); left: 16px; pointer-events: none; transform: skewX(-8deg); transform-origin: left; }
+.masthead h1 { margin: 0; font-size: clamp(28px, 4vw, 44px); font-weight: 700; line-height: 1; letter-spacing: 0.02em; text-transform: uppercase; text-shadow: 0 2px 18px rgba(0, 0, 0, 0.6); }
+.masthead h1 span { color: var(--blue); }
+.eyebrow { margin: 0 0 4px; font: 12px/1.4 var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--silver); }
+.credits { position: fixed; z-index: 15; right: 16px; bottom: max(12px, env(safe-area-inset-bottom)); display: flex; gap: 14px; align-items: flex-end; max-width: min(560px, calc(100% - 32px)); font: 11px/1.45 var(--mono); color: var(--muted); text-align: right; }
+.credits summary { cursor: pointer; list-style: none; }
+.credits summary::-webkit-details-marker { display: none; }
+.credits details[open] { padding: 10px 12px; background: var(--panel); text-align: left; }
+.credits p { margin: 6px 0 0; }
+.credits a { color: var(--silver); }
+.fallback { position: absolute; inset: 0; display: grid; place-content: center; gap: 8px; padding: 24px; font-size: 18px; text-align: center; }

@@ -1,0 +1,54 @@
+import { ContactShadows, Sparkles } from '@react-three/drei';
+import { Car } from '../car/Car';
+import { engineOrigin } from '../car/shots';
+import { ENGINE_TOPICS } from '../content/engine';
+import { ENGINE_ANCHORS } from '../engine/anchors';
+import { Engine } from '../engine/Engine';
+import { useGarage } from '../state/store';
+import { CarHotspots } from '../ui/CarHotspots';
+import { Hotspot } from '../ui/Hotspot';
+import { CameraRig } from './CameraRig';
+import { Effects } from './Effects';
+import { FrameMonitor } from './FrameMonitor';
+import { Garage } from './Garage';
+import { Lighting } from './Lighting';
+import { ReadySignal } from './ReadySignal';
+
+export function Scene() {
+  const reducedMotion = useGarage((state) => state.reducedMotion);
+  return (
+    <>
+      <color attach="background" args={['#05070a']} />
+      <fog attach="fog" args={['#05070a', 14, 32]} />
+      <Lighting />
+      <Garage />
+      <Car>
+        {(rig) => (
+          <>
+            <CameraRig bay={rig.anchors.engineBay} />
+            <Engine
+              origin={engineOrigin(rig.anchors.engineBay)}
+              hood={rig.hood}
+              hotspots={(id, selected) => (
+                <Hotspot
+                  position={ENGINE_ANCHORS[id].position}
+                  normal={ENGINE_ANCHORS[id].normal}
+                  label={ENGINE_TOPICS[id].title}
+                  summary={ENGINE_TOPICS[id].summary}
+                  selected={selected}
+                  onSelect={() => useGarage.getState().dispatch({ type: 'select-part', id })}
+                />
+              )}
+            />
+            <CarHotspots rig={rig} />
+          </>
+        )}
+      </Car>
+      <ContactShadows position={[0, 0.005, 0]} scale={9} resolution={1024} far={1.6} blur={2.4} opacity={0.8} frames={1} />
+      <Sparkles count={70} scale={[12, 3.5, 12]} position={[0, 1.8, 0]} size={1.6} speed={reducedMotion ? 0 : 0.12} opacity={0.22} color="#ffd9a6" />
+      <Effects />
+      <FrameMonitor />
+      <ReadySignal />
+    </>
+  );
+}

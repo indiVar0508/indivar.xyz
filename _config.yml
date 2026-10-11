@@ -29,6 +29,8 @@ exclude:
   - Gemfile.lock
   - README.md
   - docs
+  - garage
+  - scripts
   - test_site.rb
   - vendor
   - posts

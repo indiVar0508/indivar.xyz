@@ -54,12 +54,51 @@ The original Hello World post is preserved at `/blog/hello-world/`; its old `/#p
 | Co-authored papers and book chapters | `_data/publications.yml` |
 | About page | `about.md` |
 | Colors, layout, light/dark theme | Semantic variables at the top of `css/style.css` |
+| Garage app (3D M3 GTR) | `garage/` |
 
 Set `featured: true` on projects to show them on the homepage. Projects display as rows with their name, category, description, tags, and repository link; their order follows `_data/projects.yml`.
 
 Your own YouTube channel, X profile, LinkedIn, and GitHub links are configured in `_data/profile.yml`. The Writing page lists only your Markdown posts. Publications are separate from posts and open source contributions.
 
 Salt color, spacing, and typography foundations are vendored in `css/salt-foundations.css`, with the upstream license in `css/SALT-LICENSE.txt`. This site uses Salt tokens with custom native HTML, not Salt’s React components. Fonts load from Google Fonts with system fallbacks. Source versions and public research are in `docs/research.md`.
+
+## Garage
+
+`garage/` is a separate Vite app served at `/garage/`: an unofficial 3D garage for the BMW M3 GTR (E46) from *Need for Speed: Most Wanted*. Jekyll ignores the folder. `scripts/build-site.sh` builds both, copies the garage into `_site/garage/`, and runs the page checks.
+
+```sh
+cd garage
+npm install
+npm run dev        # http://localhost:5173/
+npm test           # unit tests
+npm run qa         # Playwright smoke tests and screenshots (run `npx playwright install chromium` once)
+```
+
+The smoke tests launch the full Chromium build on the real GPU; the headless shell's software renderer is too slow for the scene.
+
+Check the combined site with `scripts/build-site.sh`, or `scripts/build-site.sh /tmp/indivar-preview /preview` for a subpath.
+
+### Re-processing the car model
+
+Unzip the Sketchfab download into `garage/assets-src/model/`, run `garage/tools/install-ktx.sh` once, then `npm run prepare:car`. Blender 5.2 must be on `PATH`. The result, `garage/public/models/m3-gtr.glb`, is committed; `npm test` validates it.
+
+### Rebuilding the engine model
+
+The P60B40 and its engine bay are modelled by a script, not downloaded: `npm run build:engine` runs `garage/tools/blender/build_engine.py` (Blender 5.2 on `PATH`, KTX-Software from `tools/install-ktx.sh`), bakes ambient occlusion, and writes `garage/public/models/p60b40.glb`, which is committed and validated by `npm test`. Pass a folder (`npm run build:engine -- /tmp/engine`) to keep the raw export and the AO bake for inspection. Hotspot positions live in `garage/src/engine/anchors.ts`; the build reads them, and the asset check fails if a hotspot drifts off its part.
+
+### The running engine
+
+"Start engine" runs the P60B40: its sound is synthesized live by the engine's own Rust crate, `garage/crates/p60`, compiled to WebAssembly and played in an AudioWorklet (`garage/public/wasm/p60-worklet.js`). "Look inside" shows the engine as an x-ray around its moving parts, which the same crate animates from the real firing order (1-8-3-6-4-5-2-7). Timing the crate doesn't know from a source (rod length, valve timing, idle and limiter) is illustrative.
+
+- `npm run build:wasm` builds `garage/public/wasm/p60.wasm` (needs Rust and `rustup target add wasm32-unknown-unknown`) after running `cargo test`. The binary is committed, so the site build needs no Rust; `npm test` fails if it is older than the crate's sources.
+- `npm run build:internals` models the moving parts with `garage/tools/blender/build_internals.py` and writes `garage/public/models/p60b40-internals.glb`. The cam lobes are cut from the crate's timing, and `npm test` checks they still meet their valves at peak lift.
+- `cargo run --release --example render -- out.wav` (in `garage/crates/p60`) renders a test drive to a WAV file and prints each phase's level and spectrum, for listening to and tuning the sound.
+
+### Most Wanted radio
+
+The radio streams the game's licensed songs through YouTube's embedded player, starting with "I Am Rock"; nothing is re-hosted. The song list, pinned to official artist, label or Topic uploads, is `garage/src/music/tracks.ts`. YouTube loads only after a visitor opens the radio.
+
+The car model is credited in the garage footer and in `garage/CREDITS.md`: This work is based on "BMW M3 E46 GTR" (https://sketchfab.com/3d-models/bmw-m3-e46-gtr-7a0e538dd533481da79a6dcc0fc05213) by Flamestroke (https://sketchfab.com/Flamestroke) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/).
 
 ## Deploy to GitHub Pages
 
