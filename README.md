@@ -82,6 +82,14 @@ Check the combined site with `scripts/build-site.sh`, or `scripts/build-site.sh 
 
 Unzip the Sketchfab download into `garage/assets-src/model/`, run `garage/tools/install-ktx.sh` once, then `npm run prepare:car`. Blender 5.2 must be on `PATH`. The result, `garage/public/models/m3-gtr.glb`, is committed; `npm test` validates it.
 
+### Rebuilding the engine model
+
+The P60B40 and its engine bay are modelled by a script, not downloaded: `npm run build:engine` runs `garage/tools/blender/build_engine.py` (Blender 5.2 on `PATH`, KTX-Software from `tools/install-ktx.sh`), bakes ambient occlusion, and writes `garage/public/models/p60b40.glb`, which is committed and validated by `npm test`. Pass a folder (`npm run build:engine -- /tmp/engine`) to keep the raw export and the AO bake for inspection. Hotspot positions live in `garage/src/engine/anchors.ts`; the build reads them, and the asset check fails if a hotspot drifts off its part.
+
+### Most Wanted radio
+
+The radio streams the game's licensed songs through YouTube's embedded player, starting with "I Am Rock"; nothing is re-hosted. The song list, pinned to official artist, label or Topic uploads, is `garage/src/music/tracks.ts`. YouTube loads only after a visitor opens the radio.
+
 The car model is credited in the garage footer and in `garage/CREDITS.md`: This work is based on "BMW M3 E46 GTR" (https://sketchfab.com/3d-models/bmw-m3-e46-gtr-7a0e538dd533481da79a6dcc0fc05213) by Flamestroke (https://sketchfab.com/Flamestroke) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/).
 
 ## Deploy to GitHub Pages

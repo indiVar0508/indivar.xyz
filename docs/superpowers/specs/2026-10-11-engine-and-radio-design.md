@@ -74,7 +74,11 @@ Branding is left off.
 - shaped inner fenders and strut towers;
 - a firewall with heat shield and brake reservoirs;
 - a radiator with a finned core, end tanks and hoses;
-- a coolant tank, a dry-sump oil tank (illustrative) and the airbox ducts to the nose.
+- a coolant tank and a dry-sump oil tank (illustrative).
+
+As built, the airbox inlets stay open, as on the museum engine. No source shows the race car's ducting, and
+ducts over the radiator would meet the closed hood. The radiator's top dropped to 0.54 m to keep the crank view
+clear.
 
 **Asset contract** (`tools/check-assets.ts`):
 - **Nodes:** `Engine` and `Bay` roots, and one `Part_<topic>` node per engine topic.
@@ -85,8 +89,14 @@ Branding is left off.
 **Runtime:**
 - `Engine` is placed at `engineOrigin(bay)`, the same place the code engine used, so camera shots and their
   tests still apply.
-- Each part gets its own material clones for the hover highlight.
-- `Part_*` meshes take the clicks.
+- Each part gets its own material clones, so the selected part glows on its own.
+- One click handler on the model finds the clicked `Part_*`. Parts take clicks, not hover, so pointer moves
+  never raycast the whole engine.
+- three.js applies an AO map to ambient and environment light only. A shader patch lets 75% of it shade the
+  spotlights too.
+- The engine (not the bay) is skipped while the hood is shut.
+- The crank, restrictors, fuel and dry-sump hotspots moved onto their new parts. The dry-sump and headers cameras
+  look down from above, because the bumper and fender hide those parts from the front.
 
 **Facts.** No new claims. Bore, stroke, layout, crank, valvetrain, restrictors and dry sump stay verified.
 Headers, oil-tank placement and the bay stay labelled illustrative.

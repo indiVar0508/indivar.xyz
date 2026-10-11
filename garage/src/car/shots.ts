@@ -1,7 +1,7 @@
 import { MathUtils } from 'three';
 import type { CarTopicId } from '../content/car';
 import type { EngineTopicId } from '../content/engine';
-import { ENGINE_ANCHORS } from '../engine/anchors';
+import { ENGINE_ANCHORS, ENGINE_OFFSET } from '../engine/anchors';
 import { ROOM } from '../scene/layout';
 import { add, dot, length, normalize, scale, sub, type Vec3 } from '../math';
 import type { View } from '../state/view';
@@ -31,9 +31,6 @@ export const HOOD_PANEL = {
     [1.29, -0.38, 0.24],
   ] as [number, number, number][],
 };
-
-/** Engine origin relative to Marker_EngineBay: crank axis a little low and behind the bay centre. */
-export const ENGINE_OFFSET: Vec3 = [0, -0.02, -0.22];
 
 export const CAMERA_FOV = 35;
 

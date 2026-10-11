@@ -14,6 +14,7 @@
     "test": "vitest run && node tools/check-assets.ts",
     "check:assets": "node tools/check-assets.ts",
     "prepare:car": "node tools/prepare-car.ts",
+    "build:engine": "node tools/build-engine.ts",
     "check:bundle": "node tools/check-bundle.ts",
     "qa": "playwright test"
   },

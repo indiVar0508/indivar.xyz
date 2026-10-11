@@ -3,8 +3,7 @@ import { Car } from '../car/Car';
 import { engineOrigin } from '../car/shots';
 import { ENGINE_TOPICS } from '../content/engine';
 import { ENGINE_ANCHORS } from '../engine/anchors';
-import { Bay } from '../engine/Bay';
-import { P60B40 } from '../engine/P60B40';
+import { Engine } from '../engine/Engine';
 import { useGarage } from '../state/store';
 import { CarHotspots } from '../ui/CarHotspots';
 import { Hotspot } from '../ui/Hotspot';
@@ -27,9 +26,9 @@ export function Scene() {
         {(rig) => (
           <>
             <CameraRig bay={rig.anchors.engineBay} />
-            <Bay />
-            <P60B40
+            <Engine
               origin={engineOrigin(rig.anchors.engineBay)}
+              hood={rig.hood}
               hotspots={(id, selected) => (
                 <Hotspot
                   position={ENGINE_ANCHORS[id].position}
