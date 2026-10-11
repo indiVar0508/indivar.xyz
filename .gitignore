@@ -9,3 +9,5 @@ garage/assets-src/
 garage/tools/bin/
 garage/test-results/
 garage/playwright-report/
+garage/crates/p60/target/
+__pycache__/

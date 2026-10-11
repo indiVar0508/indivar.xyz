@@ -12,6 +12,6 @@ The radio plays songs from the *Need for Speed: Most Wanted* (2005) soundtrack b
 
 ## Everything else
 
-The garage, the P60B40 engine and engine bay (built in Blender by `tools/blender/build_engine.py`, shaped after BMW Museum photos of the engine), the synthesized sound, and the interface are original to this project.
+The garage, the P60B40 engine and engine bay (built in Blender by `tools/blender/build_engine.py`, shaped after BMW Museum photos of the engine), its moving parts (`tools/blender/build_internals.py`), the synthesized garage and engine sound (the engine's in Rust, `crates/p60`), and the interface are original to this project. The engine sound is an impression built from the engine's firing order, not a recording.
 
 *Need for Speed* and *Most Wanted* are trademarks of Electronic Arts. BMW and M3 are trademarks of BMW AG. This unofficial, non-commercial fan project is not affiliated with or endorsed by either.

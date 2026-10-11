@@ -31,6 +31,13 @@ describe('topicFor and breadcrumbFor', () => {
     expect(breadcrumbFor({ kind: 'bay-part', id: 'crank' })).toEqual(['Garage', 'Engine bay', 'Flat-plane crankshaft']);
     expect(breadcrumbFor({ kind: 'focus', id: 'wheels' })).toEqual(['Garage', 'Wheels and brakes']);
   });
+
+  it('explains how the engine runs when looking inside from the bay, and keeps part topics as they are', () => {
+    expect(topicFor({ kind: 'bay' }, true)?.title).toBe('How it runs');
+    expect(breadcrumbFor({ kind: 'bay' }, true)).toEqual(['Garage', 'Engine bay', 'Inside']);
+    expect(topicFor({ kind: 'bay-part', id: 'crank' }, true)?.title).toBe('Flat-plane crankshaft');
+    expect(topicFor({ kind: 'bay' }, false)?.title).toBe('P60B40 V8');
+  });
 });
 
 describe('carHotspot', () => {

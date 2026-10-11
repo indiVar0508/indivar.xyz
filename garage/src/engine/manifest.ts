@@ -49,3 +49,44 @@ export function engineAssetErrors(facts: EngineAssetFacts): string[] {
   }
   return errors;
 }
+
+// The moving parts for the x-ray view (spec 2026-10-11 "engine running" §3), in their own file.
+
+const CYLINDERS = [1, 2, 3, 4, 5, 6, 7, 8] as const;
+export const CAM_NODES = ['Cam_right_in', 'Cam_right_ex', 'Cam_left_in', 'Cam_left_ex'] as const;
+export const valveNode = (cylinder: number, exhaust: boolean): string => `Valve_${cylinder}_${exhaust ? 'ex' : 'in'}`;
+export const INTERNALS_NODES: string[] = [
+  'Internals',
+  'Crank',
+  ...CYLINDERS.map((n) => `Rod_${n}`),
+  ...CYLINDERS.map((n) => `Piston_${n}`),
+  ...CAM_NODES,
+  ...CYLINDERS.flatMap((n) => [valveNode(n, false), valveNode(n, true)]),
+];
+export const INTERNALS_BUDGET = { maxBytes: 1024 * 1024, maxTriangles: 40_000 } as const;
+
+export type InternalsAssetFacts = {
+  nodeNames: string[];
+  bytes: number;
+  triangles: number;
+  /** Each Valve_* node's extras.axis: the stem direction the page pushes it open along. */
+  valveAxes: Record<string, unknown>;
+  /** Moving-part nodes that carry a mesh themselves instead of holding it as a child. */
+  pivotsWithMeshes: string[];
+};
+
+const isUnit = (axis: unknown): boolean =>
+  Array.isArray(axis) && axis.length === 3 && axis.every((v) => typeof v === 'number') && Math.abs(Math.hypot(...(axis as number[])) - 1) < 1e-3;
+
+export function internalsAssetErrors(facts: InternalsAssetFacts): string[] {
+  const have = new Set(facts.nodeNames);
+  const errors = INTERNALS_NODES.filter((name) => !have.has(name)).map((name) => `missing node: ${name}`);
+  if (facts.bytes > INTERNALS_BUDGET.maxBytes) errors.push(`file is ${(facts.bytes / 1048576).toFixed(1)} MB; budget is 1 MB`);
+  if (facts.triangles > INTERNALS_BUDGET.maxTriangles) errors.push(`${facts.triangles} triangles; budget is ${INTERNALS_BUDGET.maxTriangles}`);
+  for (const name of INTERNALS_NODES.filter((n) => n.startsWith('Valve_') && have.has(n))) {
+    if (!isUnit(facts.valveAxes[name])) errors.push(`${name} has no unit stem axis in its extras`);
+  }
+  // Mesh quantization folds a scale and offset into the node that holds a mesh, which would move a pivot.
+  for (const name of facts.pivotsWithMeshes) errors.push(`${name} holds its mesh directly; quantization would move its pivot`);
+  return errors;
+}

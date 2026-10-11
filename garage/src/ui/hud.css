@@ -69,3 +69,38 @@
   .radio { top: max(8px, env(safe-area-inset-top)); right: 8px; bottom: auto; left: 8px; width: auto; }
   body:has(.radio) .panel { max-height: 34vh; }
 }
+/* Engine. On desktop the dock sits bottom right, above the credits and clear of the radio player (bottom left). */
+.engine-dock { position: fixed; z-index: 14; right: 16px; bottom: calc(max(12px, env(safe-area-inset-bottom)) + 28px); display: flex; flex-wrap: wrap; align-items: stretch; justify-content: flex-end; gap: 8px; max-width: calc(100% - 32px); }
+body:has(.radio) .engine-dock { max-width: calc(100% - 436px); }
+@media (min-width: 721px) {
+  body:has(.engine-dock) .panel { max-height: calc(100% - 210px); }
+}
+.tach { display: grid; align-content: center; gap: 5px; width: 128px; margin: 0; padding: 6px 12px; background: var(--panel); backdrop-filter: blur(8px); clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%); }
+.tach-reading { font: 600 17px/1 var(--font); letter-spacing: 0.04em; text-transform: uppercase; font-variant-numeric: tabular-nums; }
+.tach-track { display: block; height: 4px; background: linear-gradient(90deg, rgba(201, 206, 214, 0.18) 0 88.9%, rgba(255, 77, 77, 0.6) 88.9%); }
+.tach-bar { display: block; height: 100%; background: var(--blue); transform: scaleX(0); transform-origin: left; }
+.engine-rev { touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.engine-rev:active { border-color: var(--amber); background: rgba(255, 179, 92, 0.22); }
+.engine-rev kbd { margin-left: 6px; padding: 1px 5px; border: 1px solid var(--line); font: 11px/1.4 var(--mono); }
+.engine-error { flex-basis: 100%; margin: 0; font: 11px/1.4 var(--mono); color: var(--amber); text-align: right; }
+.firing { margin: 0 0 14px; }
+.firing figcaption, .firing p { font: 11px/1.4 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.firing p { margin: 6px 0 0; letter-spacing: 0; text-transform: none; }
+.firing ol { display: flex; gap: 4px; margin: 6px 0 0; padding: 0; list-style: none; }
+.firing li { flex: 1; padding: 6px 0; border: 1px solid var(--line); font: 600 18px/1 var(--font); text-align: center; color: var(--silver); transition: background 0.12s, color 0.12s; }
+.firing li.bank-left { border-bottom: 2px solid var(--blue); }
+.firing li.bank-right { border-bottom: 2px solid var(--silver); }
+.firing li.is-firing { background: rgba(255, 140, 50, 0.85); color: #07090c; }
+.firing .firing-note { color: var(--amber); }
+@media (prefers-reduced-motion: reduce) {
+  .firing li { transition: none; }
+}
+@media (max-width: 720px) {
+  /* Phones: the engine controls flow in among the HUD buttons, above the bottom sheet, and every button gets more
+     compact, so the engine stays in view even with the radio docked at the top. */
+  .hud-actions .hud-button { padding: 8px 10px; font-size: 13px; }
+  .engine-dock, body:has(.radio) .engine-dock { display: contents; }
+  .engine-rev kbd { display: none; }
+  .tach { width: 84px; padding: 4px 9px; }
+  .tach-reading { font-size: 14px; }
+}

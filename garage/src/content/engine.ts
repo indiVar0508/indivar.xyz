@@ -15,6 +15,21 @@ export const ENGINE_OVERVIEW: Topic<'overview'> = {
   game: [],
 };
 
+/** Shown while looking inside the running engine. */
+export const ENGINE_RUNNING: Topic<'running'> = {
+  id: 'running',
+  title: 'How it runs',
+  summary: 'Four strokes, eight cylinders, a firing every 90°.',
+  real: [
+    { text: 'Firing order 1-8-3-6-4-5-2-7, on a flat-plane crankshaft.', badge: 'verified', sources: [S.p60] },
+    { text: 'Each cylinder runs a four-stroke cycle over two turns of the crank: intake, compression, power, exhaust. Eight firings in two turns means one every 90°.', badge: 'illustrative', sources: [] },
+    { text: 'The order alternates between the banks, so each bank’s exhaust gets evenly spaced pulses, like a four-cylinder engine’s. That is the flat-plane V8’s wail.', badge: 'illustrative', sources: [] },
+    { text: 'Shown slowed 40×. The rod length, valve timing, 1,500 rpm idle and 8,500 rpm limiter are illustrative: no source gives them.', badge: 'illustrative', sources: [] },
+    { text: 'The sound is synthesized live in WebAssembly from the same firing order and valve timing as the moving parts. It is an impression of the engine, not a recording.', badge: 'illustrative', sources: [] },
+  ],
+  game: [],
+};
+
 export const ENGINE_TOPICS: Record<EngineTopicId, Topic<EngineTopicId>> = {
   layout: {
     id: 'layout',

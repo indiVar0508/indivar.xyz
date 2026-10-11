@@ -1,8 +1,9 @@
 import { create } from 'zustand';
+import type { EngineStatus } from '../audio/engineSound';
 import type { RadioState } from '../music/radio';
 import { FORCED_QUALITY } from '../qa';
 import { initialQuality, readDeviceHints, type Quality } from './quality';
-import { reduceView, SHOWROOM, type View, type ViewAction } from './view';
+import { isHoodOpen, reduceView, SHOWROOM, type View, type ViewAction } from './view';
 
 export type GarageStore = {
   view: View;
@@ -21,6 +22,10 @@ export type GarageStore = {
   coveredBottom: number;
   /** Pixels at the top of the canvas hidden by the phone's radio dock. */
   coveredTop: number;
+  engine: EngineStatus;
+  engineError: string | null;
+  /** The engine is shown as an x-ray with its moving parts inside. Only while the hood is open. */
+  inside: boolean;
   dispatch: (action: ViewAction) => void;
   setQuality: (quality: Quality) => void;
   setReady: () => void;
@@ -31,6 +36,9 @@ export type GarageStore = {
   setRadio: (radio: RadioState) => void;
   setCoveredBottom: (pixels: number) => void;
   setCoveredTop: (pixels: number) => void;
+  setEngine: (status: EngineStatus) => void;
+  setEngineError: (message: string | null) => void;
+  setInside: (inside: boolean) => void;
 };
 
 const inBrowser = typeof window !== 'undefined';
@@ -49,10 +57,14 @@ export const useGarage = create<GarageStore>()((set) => ({
   radio: { track: 0, status: 'loading' },
   coveredBottom: 0,
   coveredTop: 0,
+  engine: 'off',
+  engineError: null,
+  inside: false,
   dispatch: (action) =>
     set((state) => {
       const view = reduceView(state.view, action);
-      return view === state.view ? state : { view };
+      if (view === state.view) return state;
+      return isHoodOpen(view) ? { view } : { view, inside: false };
     }),
   setQuality: (quality) => set({ quality }),
   setReady: () => set({ ready: true }),
@@ -63,4 +75,7 @@ export const useGarage = create<GarageStore>()((set) => ({
   setRadio: (radio) => set({ radio }),
   setCoveredBottom: (coveredBottom) => set({ coveredBottom }),
   setCoveredTop: (coveredTop) => set({ coveredTop }),
+  setEngine: (engine) => set({ engine }),
+  setEngineError: (engineError) => set({ engineError }),
+  setInside: (inside) => set((state) => ({ inside: inside && isHoodOpen(state.view) })),
 }));

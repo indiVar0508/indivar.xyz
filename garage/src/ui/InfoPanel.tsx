@@ -1,4 +1,6 @@
-import { Fragment, useLayoutEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { P60 } from '../engine/geometry';
+import { insideLive } from '../engine/live';
 import type { Badge, Topic } from '../content/types';
 import { useGarage } from '../state/store';
 import { topicFor } from './topicFor';
@@ -6,7 +8,35 @@ import { topicFor } from './topicFor';
 const BADGE_LABEL: Record<Badge, string> = { verified: 'Verified', illustrative: 'Illustrative', 'game-lore': 'Game lore' };
 type Tab = 'real' | 'game';
 
-function PanelBody({ topic, eyebrow, hint }: { topic: Topic; eyebrow: string; hint: string | null }) {
+/** The firing order, lighting each cylinder as it fires in the x-ray. */
+function FiringStrip({ note }: { note: string | null }) {
+  const list = useRef<HTMLOListElement>(null);
+  useEffect(() => {
+    let shown = -1;
+    let frame = requestAnimationFrame(function draw() {
+      if (insideLive.firing !== shown) {
+        shown = insideLive.firing;
+        list.current!.querySelectorAll('li').forEach((item) => item.classList.toggle('is-firing', Number(item.dataset.cylinder) === shown));
+      }
+      frame = requestAnimationFrame(draw);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, []);
+  return (
+    <figure className="firing">
+      <figcaption>Firing order</figcaption>
+      <ol ref={list}>
+        {P60.firingOrder.map((cylinder) => (
+          <li key={cylinder} data-cylinder={cylinder} className={cylinder <= 4 ? 'bank-right' : 'bank-left'}>{cylinder}</li>
+        ))}
+      </ol>
+      <p>Cylinders 1–4 are the right bank, 5–8 the left.</p>
+      {note && <p className="firing-note">{note}</p>}
+    </figure>
+  );
+}
+
+function PanelBody({ topic, eyebrow, hint, extra }: { topic: Topic; eyebrow: string; hint: string | null; extra?: ReactNode }) {
   const tabs = (['real', 'game'] as const).filter((tab) => topic[tab].length > 0);
   const [tab, setTab] = useState<Tab>(tabs[0]!);
   const back = () => useGarage.getState().dispatch({ type: 'back' });
@@ -61,6 +91,7 @@ function PanelBody({ topic, eyebrow, hint }: { topic: Topic; eyebrow: string; hi
         <h2 id="panel-title">{topic.title}</h2>
         <button type="button" className="panel-close" onClick={back} aria-label="Back">×</button>
       </header>
+      {extra}
       {tabs.length > 1 ? (
         <>
           <div className="panel-tabs" role="tablist" aria-label="Facts about">
@@ -82,15 +113,15 @@ function PanelBody({ topic, eyebrow, hint }: { topic: Topic; eyebrow: string; hi
 
 export function InfoPanel() {
   const view = useGarage((state) => state.view);
-  const topic = topicFor(view);
+  const inside = useGarage((state) => state.inside);
+  const engine = useGarage((state) => state.engine);
+  const topic = topicFor(view, inside);
   if (!topic) return null;
   const inBay = view.kind === 'bay' || view.kind === 'bay-part';
-  return (
-    <PanelBody
-      key={topic.id}
-      topic={topic}
-      eyebrow={inBay ? 'P60B40 V8' : 'BMW M3 GTR'}
-      hint={view.kind === 'bay' ? 'Pick a highlighted part to see what it does.' : null}
-    />
-  );
+  if (topic.id === 'running') {
+    const note = engine === 'off' || engine === 'stopping' ? 'Start the engine to see it run.' : null;
+    return <PanelBody key={topic.id} topic={topic} eyebrow="P60B40 V8" hint={null} extra={<FiringStrip note={note} />} />;
+  }
+  const hint = view.kind === 'bay' ? 'Pick a highlighted part to see what it does.' : null;
+  return <PanelBody key={topic.id} topic={topic} eyebrow={inBay ? 'P60B40 V8' : 'BMW M3 GTR'} hint={hint} />;
 }

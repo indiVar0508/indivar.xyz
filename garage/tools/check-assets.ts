@@ -1,12 +1,13 @@
-// Validates public/models/m3-gtr.glb against the car asset contract (spec §4.2) and public/models/p60b40.glb against
-// the engine contract (spec 2026-10-11 §2), each with its budgets.
+// Validates public/models/m3-gtr.glb against the car asset contract (spec §4.2), public/models/p60b40.glb against
+// the engine contract (spec 2026-10-11 §2), and public/models/p60b40-internals.glb against the moving parts' contract
+// (spec 2026-10-11 "engine running" §3), each with its budgets.
 import { statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { getBounds, NodeIO, type Document } from '@gltf-transform/core';
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
 import { MeshoptDecoder } from 'meshoptimizer';
 import { assetErrors } from '../src/car/manifest.ts';
-import { ENGINE_PARTS, engineAssetErrors, partNode, type Box } from '../src/engine/manifest.ts';
+import { ENGINE_PARTS, engineAssetErrors, INTERNALS_NODES, internalsAssetErrors, partNode, type Box } from '../src/engine/manifest.ts';
 import type { Vec3 } from '../src/math.ts';
 
 const models = resolve(import.meta.dirname, '../public/models');
@@ -65,4 +66,15 @@ const engine = await check('p60b40.glb', (document, bytes) => {
   });
 });
 
-if (!car || !engine) process.exit(1);
+const internals = await check('p60b40-internals.glb', (document, bytes) => {
+  const nodes = document.getRoot().listNodes();
+  return internalsAssetErrors({
+    nodeNames: nodes.map((node) => node.getName()),
+    bytes,
+    triangles: triangleCount(document),
+    valveAxes: Object.fromEntries(nodes.filter((node) => node.getName().startsWith('Valve_')).map((node) => [node.getName(), node.getExtras().axis])),
+    pivotsWithMeshes: nodes.filter((node) => INTERNALS_NODES.includes(node.getName()) && node.getMesh()).map((node) => node.getName()),
+  });
+});
+
+if (!car || !engine || !internals) process.exit(1);

@@ -1,9 +1,17 @@
-import { Color, Mesh, MeshStandardMaterial, type Material, type Object3D } from 'three';
+import { AdditiveBlending, Color, DoubleSide, Mesh, MeshStandardMaterial, ShaderMaterial, type Material, type Object3D } from 'three';
 import type { EngineTopicId } from '../content/engine';
 import { ENGINE_NODES, ENGINE_PARTS, partNode } from './manifest';
 
 type PartId = (typeof ENGINE_PARTS)[number];
-export type EngineRig = { root: Object3D; engine: Object3D; bay: Object3D; parts: Record<PartId, Object3D>; materials: Record<PartId, MeshStandardMaterial[]> };
+export type EngineRig = {
+  root: Object3D;
+  engine: Object3D;
+  bay: Object3D;
+  parts: Record<PartId, Object3D>;
+  materials: Record<PartId, MeshStandardMaterial[]>;
+  /** One x-ray material per part, so the selected part's can be brighter. */
+  ghosts: Record<PartId, ShaderMaterial>;
+};
 
 const HIGHLIGHT = new Color('#2f6bff');
 const HIGHLIGHT_INTENSITY = 0.55;
@@ -63,7 +71,8 @@ export function prepareEngine(root: Object3D): EngineRig {
     if (object instanceof Mesh && object.material instanceof MeshStandardMaterial && object.material.aoMap) occludeDirectLight(object.material);
   });
 
-  const rig: EngineRig = { root, engine: root.getObjectByName('Engine')!, bay: root.getObjectByName('Bay')!, parts, materials };
+  const ghosts = Object.fromEntries(ENGINE_PARTS.map((id) => [id, ghostMaterial()])) as Record<PartId, ShaderMaterial>;
+  const rig: EngineRig = { root, engine: root.getObjectByName('Engine')!, bay: root.getObjectByName('Bay')!, parts, materials, ghosts };
   root.userData.rig = rig;
   return rig;
 }
@@ -75,5 +84,52 @@ export function setHighlight(rig: EngineRig, id: EngineTopicId | null): void {
       material.emissive.copy(part === id ? HIGHLIGHT : NONE);
       material.emissiveIntensity = part === id ? HIGHLIGHT_INTENSITY : 0;
     }
+  }
+}
+
+const GHOST_EDGE = 0.32;
+const GHOST_SELECTED_EDGE = 0.9;
+
+/** A see-through x-ray: faint where a surface faces the camera, bright along its silhouette. Additive, so no sorting. */
+function ghostMaterial(): ShaderMaterial {
+  return new ShaderMaterial({
+    uniforms: { color: { value: new Color('#3d7bff') }, base: { value: 0.018 }, edge: { value: GHOST_EDGE } },
+    vertexShader: `varying vec3 vNormal;
+varying vec3 vView;
+void main() {
+  vec4 view = modelViewMatrix * vec4(position, 1.0);
+  vNormal = normalize(normalMatrix * normal);
+  vView = -view.xyz;
+  gl_Position = projectionMatrix * view;
+}`,
+    fragmentShader: `uniform vec3 color;
+uniform float base;
+uniform float edge;
+varying vec3 vNormal;
+varying vec3 vView;
+void main() {
+  float facing = abs(dot(normalize(vNormal), normalize(vView)));
+  gl_FragColor = vec4(color * (base + edge * pow(1.0 - facing, 3.0)), 1.0);
+}`,
+    transparent: true,
+    depthWrite: false,
+    blending: AdditiveBlending,
+    side: DoubleSide,
+  });
+}
+
+/**
+ * Shows the engine as an x-ray (or puts it back), so the moving parts inside show through. The bay stays solid.
+ * The engine stops casting shadows meanwhile, or it would still darken the parts inside.
+ */
+export function setXray(rig: EngineRig, on: boolean, selected: EngineTopicId | null): void {
+  for (const id of ENGINE_PARTS) {
+    rig.ghosts[id].uniforms.edge!.value = id === selected ? GHOST_SELECTED_EDGE : GHOST_EDGE;
+    rig.parts[id].traverse((object) => {
+      if (!(object instanceof Mesh)) return;
+      object.userData.solid ??= object.material;
+      object.material = on ? rig.ghosts[id] : object.userData.solid;
+      object.castShadow = !on;
+    });
   }
 }

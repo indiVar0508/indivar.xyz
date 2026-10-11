@@ -5,14 +5,14 @@ import { ENGINE_TOPIC_IDS } from '../content/engine';
 import { BAY, ENGINE_ANCHORS, RADIATOR } from '../engine/anchors';
 import { add, type Vec3 } from '../math';
 import { ROOM } from '../scene/layout';
-import { CAMERA_BOUNDS, CAR_SHOTS, CAR_SOLIDS, CAMERA_FOV, orbitLimits, engineOrigin, engineShot, fovFor, HOOD_PANEL, insideSolid, segmentHitsHood, shotFor } from './shots';
+import { CAMERA_BOUNDS, CAR_SHOTS, CAR_SOLIDS, CAMERA_FOV, orbitLimits, engineOrigin, engineShot, fovFor, HOOD_PANEL, insideShot, insideSolid, segmentHitsHood, shotFor } from './shots';
 import { HOOD_OPEN_DEG } from './hood';
 import { isHoodOpen, SHOWROOM, type View } from '../state/view';
 
 const EXPECTED_BAY: Vec3 = [0, 0.3133, 1.4806]; // prepare-report.json engineBay
 const open = MathUtils.degToRad(HOOD_OPEN_DEG);
 const origin = engineOrigin(EXPECTED_BAY);
-const engineShots = ENGINE_TOPIC_IDS.map((id) => [id, engineShot(origin, id)] as const);
+const engineShots = [...ENGINE_TOPIC_IDS.map((id) => [id, engineShot(origin, id)] as const), ['inside', insideShot(origin)] as const];
 const allShots = [...Object.entries(CAR_SHOTS), ...engineShots];
 
 describe('camera shots', () => {
@@ -74,6 +74,21 @@ describe('camera shots', () => {
       expect(shotFor(view, EXPECTED_BAY).target).toHaveLength(3);
     }
     expect(shotFor({ kind: 'bay-part', id: 'crank' }, EXPECTED_BAY)).toEqual(engineShot(origin, 'crank'));
+    expect(shotFor({ kind: 'bay' }, EXPECTED_BAY, true)).toEqual(insideShot(origin));
+    expect(shotFor({ kind: 'bay-part', id: 'crank' }, EXPECTED_BAY, true)).toEqual(engineShot(origin, 'crank'));
+  });
+
+  it('frames the whole engine when looking inside', () => {
+    const { position, target } = insideShot(origin);
+    const camera = new PerspectiveCamera(CAMERA_FOV, 16 / 9, 0.05, 60);
+    camera.position.set(...position);
+    camera.lookAt(...target);
+    camera.updateMatrixWorld();
+    for (const x of [-0.42, 0.42]) for (const y of [-0.12, 0.6]) for (const z of [-0.3, 0.42]) {
+      const ndc = new Vector3(...add(origin, [x, y, z])).project(camera);
+      expect(Math.abs(ndc.x)).toBeLessThan(0.95);
+      expect(Math.abs(ndc.y)).toBeLessThan(0.95);
+    }
   });
 });
 
@@ -102,16 +117,17 @@ function orbitPosition(target: Vec3, azimuth: number, polar: number, distance: n
 }
 
 describe('orbit limits', () => {
-  const views: View[] = [
+  const views: [View, boolean][] = [
     SHOWROOM,
     ...CAR_TOPIC_IDS.filter((id) => id !== 'hood').map((id) => ({ kind: 'focus', id }) as View),
     { kind: 'bay' },
     ...ENGINE_TOPIC_IDS.map((id) => ({ kind: 'bay-part', id }) as View),
-  ];
+  ].map((view) => [view, false] as [View, boolean]);
+  views.push([{ kind: 'bay' }, true]);
 
   it('never lets the visitor orbit or zoom the camera into the car, or through the open hood', () => {
-    for (const view of views) {
-      const shot = shotFor(view, EXPECTED_BAY);
+    for (const [view, inside] of views) {
+      const shot = shotFor(view, EXPECTED_BAY, inside);
       const limits = orbitLimits(view, shot);
       const azimuths = Number.isFinite(limits.minAzimuth)
         ? [limits.minAzimuth, (limits.minAzimuth + limits.maxAzimuth) / 2, limits.maxAzimuth]
@@ -130,8 +146,8 @@ describe('orbit limits', () => {
   });
 
   it('includes each view’s own shot', () => {
-    for (const view of views) {
-      const shot = shotFor(view, EXPECTED_BAY);
+    for (const [view, inside] of views) {
+      const shot = shotFor(view, EXPECTED_BAY, inside);
       const limits = orbitLimits(view, shot);
       const [dx, dy, dz] = [0, 1, 2].map((axis) => shot.position[axis]! - shot.target[axis]!) as Vec3;
       const distance = Math.hypot(dx, dy, dz);

@@ -762,4 +762,5 @@ def main():
                               export_normals=True, export_vertex_color="ACTIVE", export_cameras=False, export_lights=False)
 
 
-main()
+if __name__ == "__main__":  # tools/blender/build_internals.py imports the helpers above
+    main()

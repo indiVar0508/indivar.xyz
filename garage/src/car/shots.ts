@@ -65,14 +65,26 @@ export function engineShot(origin: Vec3, id: EngineTopicId): Shot {
   return { position: add(target, scale(direction, ENGINE_VIEW_DISTANCE)), target };
 }
 
-export function shotFor(view: View, bay: Vec3): Shot {
+/** Looking inside: the whole engine, from above the nose, so all eight cylinders show through the x-ray. */
+const INSIDE_TARGET: Vec3 = [0, 0.16, 0.02];
+const INSIDE_DIRECTION: Vec3 = [0.35, 1, 0.25];
+const INSIDE_DISTANCE = 2.0;
+
+export function insideShot(origin: Vec3): Shot {
+  const target = add(origin, INSIDE_TARGET);
+  const direction = normalize(add(normalize(INSIDE_DIRECTION), ENGINE_VIEW_BIAS));
+  return { position: add(target, scale(direction, INSIDE_DISTANCE)), target };
+}
+
+/** The camera shot for a view. Looking inside changes only the bay's overview; part views keep their own. */
+export function shotFor(view: View, bay: Vec3, inside = false): Shot {
   switch (view.kind) {
     case 'showroom':
       return CAR_SHOTS.showroom;
     case 'focus':
       return CAR_SHOTS[view.id];
     case 'bay':
-      return CAR_SHOTS.bay;
+      return inside ? insideShot(engineOrigin(bay)) : CAR_SHOTS.bay;
     case 'bay-part':
       return engineShot(engineOrigin(bay), view.id);
   }

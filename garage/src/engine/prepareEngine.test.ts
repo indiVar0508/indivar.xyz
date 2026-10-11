@@ -1,7 +1,7 @@
-import { BoxGeometry, Group, Mesh, MeshStandardMaterial, Object3D, Texture, type WebGLProgramParametersWithUniforms } from 'three';
+import { BoxGeometry, Group, Mesh, MeshStandardMaterial, Object3D, ShaderMaterial, Texture, type WebGLProgramParametersWithUniforms } from 'three';
 import { describe, expect, it } from 'vitest';
 import { ENGINE_PARTS, partNode } from './manifest';
-import { prepareEngine, setHighlight } from './prepareEngine';
+import { prepareEngine, setHighlight, setXray } from './prepareEngine';
 
 /** The engine GLB's shape: Engine and Bay roots, a Part_* node per part, meshes sharing materials across parts. */
 function fakeEngine(omit?: string) {
@@ -55,5 +55,27 @@ describe('prepareEngine', () => {
     const mesh = rig.parts.fuel.children[0] as Mesh;
     expect(mesh.castShadow && mesh.receiveShadow).toBe(true);
     expect(prepareEngine(root)).toBe(rig);
+  });
+});
+
+describe('setXray', () => {
+  it('turns the engine, not the bay, into a shadowless ghost, brightest on the selected part, and back', () => {
+    const { root } = fakeEngine();
+    const rig = prepareEngine(root);
+    const solid = materialOf(rig.parts.heads);
+    const bay = (rig.bay.children[0] as Mesh).material;
+    setXray(rig, true, 'heads');
+    const ghost = (rig.parts.heads.children[0] as Mesh).material as ShaderMaterial;
+    expect(ghost).toBeInstanceOf(ShaderMaterial);
+    expect(ghost.depthWrite).toBe(false);
+    expect(rig.parts.heads.children[0]!.castShadow).toBe(false);
+    const edge = (id: keyof typeof rig.parts) => ((rig.parts[id].children[0] as Mesh).material as ShaderMaterial).uniforms.edge!.value as number;
+    expect(edge('heads')).toBeGreaterThan(edge('layout'));
+    expect((rig.bay.children[0] as Mesh).material).toBe(bay);
+    setXray(rig, true, 'layout');
+    expect(edge('layout')).toBeGreaterThan(edge('heads'));
+    setXray(rig, false, null);
+    expect(materialOf(rig.parts.heads)).toBe(solid);
+    expect(rig.parts.heads.children[0]!.castShadow).toBe(true);
   });
 });

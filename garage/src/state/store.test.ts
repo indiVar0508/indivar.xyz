@@ -3,7 +3,7 @@ import { useGarage } from './store';
 import { SHOWROOM } from './view';
 
 describe('useGarage', () => {
-  beforeEach(() => useGarage.setState({ view: SHOWROOM, quality: 'high', ready: false, soundOn: false, ownTrack: null, trackError: null }));
+  beforeEach(() => useGarage.setState({ view: SHOWROOM, quality: 'high', ready: false, soundOn: false, ownTrack: null, trackError: null, inside: false }));
 
   it('routes view actions through the reducer', () => {
     useGarage.getState().dispatch({ type: 'select-car', id: 'hood' });
@@ -16,6 +16,18 @@ describe('useGarage', () => {
     useGarage.getState().dispatch({ type: 'back' });
     unsubscribe();
     expect(calls).toBe(0);
+  });
+
+  it('looks inside the engine only with the hood open, and stops when it closes', () => {
+    const s = useGarage.getState();
+    s.setInside(true);
+    expect(useGarage.getState().inside).toBe(false);
+    s.dispatch({ type: 'select-car', id: 'hood' });
+    s.setInside(true);
+    s.dispatch({ type: 'select-part', id: 'crank' });
+    expect(useGarage.getState().inside).toBe(true);
+    s.dispatch({ type: 'close-hood' });
+    expect(useGarage.getState().inside).toBe(false);
   });
 
   it('stores settings', () => {

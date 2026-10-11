@@ -1,4 +1,5 @@
 import { Ambience } from './ambience';
+import { EngineSound, engineLive, type EngineStatus } from './engineSound';
 import { hoodClunk, uiTick } from './sfx';
 
 /** Owns the AudioContext. Created lazily, because browsers only allow audio after a user gesture. */
@@ -9,9 +10,13 @@ class AudioController {
   private track: HTMLAudioElement | null = null;
   private trackUrl: string | null = null;
   private radioPlaying = false;
+  private engine: Promise<EngineSound> | null = null;
+  /** Told whenever the engine's status changes on the audio thread. */
+  onEngineStatus: (status: EngineStatus) => void = () => undefined;
 
   async setEnabled(on: boolean): Promise<void> {
     if (!on) {
+      this.resetEngine();
       this.ambience?.stop();
       this.ambience = null;
       this.track?.pause();
@@ -39,7 +44,33 @@ class AudioController {
   }
 
   private duck(): void {
-    this.ambience?.setDuck(this.radioPlaying || (this.track !== null && !this.track.paused));
+    this.ambience?.setDuck(this.radioPlaying || engineLive.status !== 'off' || (this.track !== null && !this.track.paused));
+  }
+
+  /** Starts the P60B40. Turns the audio on first if it isn't; rejects if the engine sound can't load here. */
+  async startEngine(): Promise<void> {
+    await this.setEnabled(true);
+    this.engine ??= EngineSound.create(this.ctx!, this.master!, (status) => {
+      this.duck();
+      this.onEngineStatus(status);
+    }).catch((error: unknown) => {
+      this.engine = null;
+      throw error;
+    });
+    (await this.engine).start();
+  }
+
+  stopEngine(): void {
+    void this.engine?.then((engine) => engine.stop());
+  }
+
+  /** The accelerator, 0 to 1. */
+  setThrottle(pedal: number): void {
+    void this.engine?.then((engine) => engine.throttle(pedal));
+  }
+
+  private resetEngine(): void {
+    void this.engine?.then((engine) => engine.reset());
   }
 
   sfx(kind: 'hood' | 'tick'): void {

@@ -87,3 +87,25 @@ describe('bindAudio with the Most Wanted radio', () => {
     expect(audio.setRadioPlaying).toHaveBeenLastCalledWith(false);
   });
 });
+
+describe('bindAudio with the engine', () => {
+  beforeEach(() => {
+    target = new EventTarget();
+    Object.assign(globalThis, { window: target, localStorage: { getItem: () => 'off', setItem: () => undefined } });
+    useGarage.setState({ view: SHOWROOM, soundOn: true, engine: 'off' });
+    vi.clearAllMocks();
+    bindAudio();
+  });
+
+  it('shows what the audio thread reports', () => {
+    (audio as unknown as { onEngineStatus(status: string): void }).onEngineStatus('running');
+    expect(useGarage.getState().engine).toBe('running');
+  });
+
+  it('stops the engine when sound is turned off', () => {
+    useGarage.getState().setEngine('running');
+    useGarage.getState().setSound(false);
+    expect(useGarage.getState().engine).toBe('off');
+    expect(audio.setEnabled).toHaveBeenCalledWith(false);
+  });
+});

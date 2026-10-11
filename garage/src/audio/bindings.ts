@@ -8,12 +8,15 @@ const radioPlaying = (state: GarageStore) => state.radioOpen && state.radio.stat
 
 /** Connects the store to the audio controller and the radio. Call once at startup. */
 export function bindAudio(): void {
+  audio.onEngineStatus = (status) => useGarage.getState().setEngine(status);
   useGarage.subscribe((state, previous) => {
     const { setSound, setOwnTrack, setRadioOpen } = useGarage.getState();
     if (state.soundOn !== previous.soundOn) {
       writeSoundPref(state.soundOn);
       void audio.setEnabled(state.soundOn);
       if (!state.soundOn && state.radioOpen) station.pause();
+      // The engine is heard, not just seen: with sound off it stops (the controller resets it).
+      if (!state.soundOn && state.engine !== 'off') useGarage.getState().setEngine('off');
     }
     if (state.soundOn && isHoodOpen(state.view) !== isHoodOpen(previous.view)) audio.sfx('hood');
     // One music source at a time: the radio and the visitor's own track replace each other.

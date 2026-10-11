@@ -16,7 +16,9 @@
     "prepare:car": "node tools/prepare-car.ts",
     "build:engine": "node tools/build-engine.ts",
     "check:bundle": "node tools/check-bundle.ts",
-    "qa": "playwright test"
+    "qa": "playwright test",
+    "build:wasm": "node tools/build-wasm.ts",
+    "build:internals": "node tools/build-internals.ts"
   },
   "dependencies": {
     "@fontsource/pt-mono": "^5.3.0",

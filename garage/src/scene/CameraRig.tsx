@@ -12,6 +12,7 @@ import { stepDrift } from './drift';
 export function CameraRig({ bay }: { bay: Vec3 }) {
   const controls = useRef<ComponentRef<typeof CameraControls>>(null);
   const view = useGarage((state) => state.view);
+  const inside = useGarage((state) => state.inside);
   const reducedMotion = useGarage((state) => state.reducedMotion);
   const camera = useThree((state) => state.camera);
   const size = useThree((state) => state.size);
@@ -33,7 +34,7 @@ export function CameraRig({ bay }: { bay: Vec3 }) {
   useEffect(() => {
     const rig = controls.current;
     if (!rig) return;
-    const shot = shotFor(view, bay);
+    const shot = shotFor(view, bay, inside);
     const limits = orbitLimits(view, shot);
     rig.minAzimuthAngle = limits.minAzimuth;
     rig.maxAzimuthAngle = limits.maxAzimuth;
@@ -45,7 +46,7 @@ export function CameraRig({ bay }: { bay: Vec3 }) {
     void rig.setLookAt(p[0], p[1], p[2], t[0], t[1], t[2], !reducedMotion);
     rig.normalizeRotations(); // after a long drift, turn the short way round to the new shot
     timer.idle = 0;
-  }, [view, bay, reducedMotion]);
+  }, [view, bay, inside, reducedMotion]);
 
   useEffect(() => {
     const rig = controls.current;

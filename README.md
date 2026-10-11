@@ -86,6 +86,14 @@ Unzip the Sketchfab download into `garage/assets-src/model/`, run `garage/tools/
 
 The P60B40 and its engine bay are modelled by a script, not downloaded: `npm run build:engine` runs `garage/tools/blender/build_engine.py` (Blender 5.2 on `PATH`, KTX-Software from `tools/install-ktx.sh`), bakes ambient occlusion, and writes `garage/public/models/p60b40.glb`, which is committed and validated by `npm test`. Pass a folder (`npm run build:engine -- /tmp/engine`) to keep the raw export and the AO bake for inspection. Hotspot positions live in `garage/src/engine/anchors.ts`; the build reads them, and the asset check fails if a hotspot drifts off its part.
 
+### The running engine
+
+"Start engine" runs the P60B40: its sound is synthesized live by the engine's own Rust crate, `garage/crates/p60`, compiled to WebAssembly and played in an AudioWorklet (`garage/public/wasm/p60-worklet.js`). "Look inside" shows the engine as an x-ray around its moving parts, which the same crate animates from the real firing order (1-8-3-6-4-5-2-7). Timing the crate doesn't know from a source (rod length, valve timing, idle and limiter) is illustrative.
+
+- `npm run build:wasm` builds `garage/public/wasm/p60.wasm` (needs Rust and `rustup target add wasm32-unknown-unknown`) after running `cargo test`. The binary is committed, so the site build needs no Rust; `npm test` fails if it is older than the crate's sources.
+- `npm run build:internals` models the moving parts with `garage/tools/blender/build_internals.py` and writes `garage/public/models/p60b40-internals.glb`. The cam lobes are cut from the crate's timing, and `npm test` checks they still meet their valves at peak lift.
+- `cargo run --release --example render -- out.wav` (in `garage/crates/p60`) renders a test drive to a WAV file and prints each phase's level and spectrum, for listening to and tuning the sound.
+
 ### Most Wanted radio
 
 The radio streams the game's licensed songs through YouTube's embedded player, starting with "I Am Rock"; nothing is re-hosted. The song list, pinned to official artist, label or Topic uploads, is `garage/src/music/tracks.ts`. YouTube loads only after a visitor opens the radio.

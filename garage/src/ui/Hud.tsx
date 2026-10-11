@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useGarage } from '../state/store';
 import { isHoodOpen } from '../state/view';
+import { EngineDock } from './EngineDock';
 import { InfoPanel } from './InfoPanel';
 import { RadioDock } from './RadioDock';
 import { SoundControls } from './SoundControls';
@@ -10,6 +11,7 @@ export function Hud() {
   const view = useGarage((state) => state.view);
   const ready = useGarage((state) => state.ready);
   const dispatch = useGarage((state) => state.dispatch);
+  const inside = useGarage((state) => state.inside);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -21,7 +23,7 @@ export function Hud() {
 
   if (!ready) return null;
   const hoodOpen = isHoodOpen(view);
-  const crumbs = breadcrumbFor(view);
+  const crumbs = breadcrumbFor(view, inside);
   return (
     <>
       <nav className="crumbs" aria-label="Location">
@@ -36,6 +38,7 @@ export function Hud() {
           {hoodOpen ? 'Close the hood' : 'Open the hood'}
         </button>
         <SoundControls />
+        <EngineDock />
       </div>
       <p className="hint">Drag to orbit · Pick a marker · Esc to go back</p>
       <InfoPanel />

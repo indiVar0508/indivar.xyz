@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { CAR_TOPIC_IDS, CAR_TOPICS } from './car';
-import { ENGINE_OVERVIEW, ENGINE_TOPIC_IDS, ENGINE_TOPICS } from './engine';
+import { ENGINE_OVERVIEW, ENGINE_RUNNING, ENGINE_TOPIC_IDS, ENGINE_TOPICS } from './engine';
 import { loaderFacts } from './loaderFacts';
 import type { Topic } from './types';
 import { validateTopics } from './validate';
 
-const all: Topic[] = [...Object.values(CAR_TOPICS), ...Object.values(ENGINE_TOPICS), ENGINE_OVERVIEW];
+const all: Topic[] = [...Object.values(CAR_TOPICS), ...Object.values(ENGINE_TOPICS), ENGINE_OVERVIEW, ENGINE_RUNNING];
 
 describe('content', () => {
   it('passes validation', () => {

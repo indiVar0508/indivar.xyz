@@ -7,13 +7,14 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import { bindAudio } from './audio/bindings';
+import { engineLive } from './audio/engineSound';
 import { QA } from './qa';
 import { useGarage } from './state/store';
 import { ErrorBoundary } from './ui/ErrorBoundary';
 import { Fallback } from './ui/Fallback';
 import { supportsWebGL2 } from './webgl';
 
-if (QA) Object.assign(window, { garage: useGarage });
+if (QA) Object.assign(window, { garage: useGarage, garageEngine: engineLive });
 
 bindAudio();
 
