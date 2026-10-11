@@ -14,14 +14,16 @@ export function bindAudio(): void {
   });
   if (readSoundPref()) {
     // Browsers block audio until a gesture, so a remembered "on" waits for the first one, then stops listening.
+    // pointerup (not pointerdown) is the gesture that counts on touch screens; Escape never counts.
     // A gesture on the sound button is left to the button, which would otherwise toggle straight back off.
     const firstGesture = new AbortController();
     const resume = (event: Event) => {
+      if ((event as KeyboardEvent).key === 'Escape') return;
       firstGesture.abort();
       const target = event.target as Partial<Element> | null;
       if (!target?.closest?.('[data-sound-toggle]')) useGarage.getState().setSound(true);
     };
-    window.addEventListener('pointerdown', resume, { signal: firstGesture.signal });
+    window.addEventListener('pointerup', resume, { signal: firstGesture.signal });
     window.addEventListener('keydown', resume, { signal: firstGesture.signal });
   }
 }

@@ -6,8 +6,8 @@ import { bindAudio } from './bindings';
 vi.mock('./controller', () => ({ audio: { setEnabled: vi.fn(async () => undefined), sfx: vi.fn() } }));
 
 let target: EventTarget;
-const gesture = (type: 'pointerdown' | 'keydown', on?: { closest: (selector: string) => unknown }) => {
-  const event = new Event(type);
+const gesture = (type: 'pointerup' | 'keydown', on?: { closest: (selector: string) => unknown }, key = 'Enter') => {
+  const event = Object.assign(new Event(type), { key });
   if (on) Object.defineProperty(event, 'target', { value: on });
   target.dispatchEvent(event);
 };
@@ -23,17 +23,24 @@ describe('bindAudio with sound remembered as on', () => {
 
   it('waits for the first gesture, then turns sound on', () => {
     expect(useGarage.getState().soundOn).toBe(false);
-    gesture('pointerdown');
+    gesture('pointerup');
     expect(useGarage.getState().soundOn).toBe(true);
   });
 
   it('leaves a gesture on the sound button to the button, so it does not toggle twice', () => {
-    gesture('pointerdown', soundButton);
+    gesture('pointerup', soundButton);
     expect(useGarage.getState().soundOn).toBe(false);
   });
 
+  it('ignores Escape, which browsers do not count as a gesture that may start audio', () => {
+    gesture('keydown', undefined, 'Escape');
+    expect(useGarage.getState().soundOn).toBe(false);
+    gesture('keydown');
+    expect(useGarage.getState().soundOn).toBe(true);
+  });
+
   it('stops listening after the first gesture, so a later key press never turns sound back on', () => {
-    gesture('pointerdown');
+    gesture('pointerup');
     useGarage.getState().setSound(false);
     gesture('keydown');
     expect(useGarage.getState().soundOn).toBe(false);
