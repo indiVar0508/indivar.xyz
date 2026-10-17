@@ -9,8 +9,11 @@ const STATUS: readonly EngineStatus[] = ['off', 'starting', 'running', 'stopping
 
 export const WORKLET_URL = `${import.meta.env.BASE_URL}wasm/p60-worklet.js`;
 
-/** Engine speed as the audio thread last reported it, for the tach and the animation, which read it every frame. */
-export const engineLive = { rpm: 0, status: 'off' as EngineStatus };
+/**
+ * The engine as the audio thread last reported it, for the tach and the animation, which read it every frame: speed,
+ * load (what the throttle and idle control give it, 0 to 1) and turbo boost (0 to 1).
+ */
+export const engineLive = { rpm: 0, load: 0, boost: 0, status: 'off' as EngineStatus };
 
 /** The P60B40's synthesized sound: p60.wasm in an AudioWorklet, with a little of the garage's reverb. */
 export class EngineSound {
@@ -20,10 +23,12 @@ export class EngineSound {
 
   private constructor(node: AudioWorkletNode, onStatus: (status: EngineStatus) => void) {
     this.node = node;
-    node.port.onmessage = ({ data }: MessageEvent<{ rpm: number; status: number }>) => {
+    node.port.onmessage = ({ data }: MessageEvent<{ rpm: number; load: number; boost: number; status: number }>) => {
       if (!this.listening) return;
       const status = STATUS[data.status] ?? 'off';
       engineLive.rpm = data.rpm;
+      engineLive.load = data.load;
+      engineLive.boost = data.boost;
       if (status !== engineLive.status) {
         engineLive.status = status;
         onStatus(status);
@@ -63,10 +68,17 @@ export class EngineSound {
     this.listening = false;
     this.node.port.postMessage({ type: 'reset' });
     engineLive.rpm = 0;
+    engineLive.load = 0;
+    engineLive.boost = 0;
     engineLive.status = 'off';
   }
 
   throttle(pedal: number): void {
     this.node.port.postMessage({ type: 'throttle', value: pedal });
+  }
+
+  /** Fits or removes the game turbo kit. */
+  turbo(fitted: boolean): void {
+    this.node.port.postMessage({ type: 'turbo', value: fitted });
   }
 }

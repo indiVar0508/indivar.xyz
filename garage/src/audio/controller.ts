@@ -11,6 +11,7 @@ class AudioController {
   private trackUrl: string | null = null;
   private radioPlaying = false;
   private engine: Promise<EngineSound> | null = null;
+  private turbo = false;
   /** Told whenever the engine's status changes on the audio thread. */
   onEngineStatus: (status: EngineStatus) => void = () => undefined;
 
@@ -57,11 +58,19 @@ class AudioController {
       this.engine = null;
       throw error;
     });
-    (await this.engine).start();
+    const engine = await this.engine;
+    engine.turbo(this.turbo);
+    engine.start();
   }
 
   stopEngine(): void {
     void this.engine?.then((engine) => engine.stop());
+  }
+
+  /** Fits or removes the game turbo kit; remembered for an engine that hasn't loaded yet. */
+  setTurbo(fitted: boolean): void {
+    this.turbo = fitted;
+    void this.engine?.then((engine) => engine.turbo(fitted));
   }
 
   /** The accelerator, 0 to 1. */

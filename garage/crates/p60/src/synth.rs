@@ -5,7 +5,8 @@
 //! tailpipe. Because a flat-plane crank alternates banks, each bank hears evenly spaced pulses, like a four-cylinder,
 //! which is where the wail comes from. Intake suction rings the airbox and pulls rush through the restrictors; the
 //! valvetrain ticks; the block rings; the starter whines and chugs on each compression; unburned fuel pops in the
-//! exhaust on the overrun and at the limiter.
+//! exhaust on the overrun and at the limiter. With the game turbo kit fitted, the compressor whistles as it spools,
+//! the blow-off valve hisses when the throttle snaps shut, and the turbines soften the exhaust.
 
 use crate::engine::{Engine, Status, LIMIT_RPM};
 use crate::timing::{bank, fire_angle, valve_events, CYLINDERS};
@@ -155,6 +156,15 @@ pub struct Synth {
     ring: [Biquad; 2],
     pop_tone: Biquad,
     starter_tone: Biquad,
+    hiss_tone: Biquad,
+    blowoff_tone: Biquad,
+    /// The turbines take the edge off the exhaust: a lowpass blended in by `fitted`.
+    turbine: [f32; 2],
+    turbine_coeff: f32,
+    fitted: f32,
+    whistle_phase: f32,
+    blowoff: f32,
+    blowoff_decay: f32,
     tick: f32,
     tick_decay: f32,
     /// Combustion's knock on the block this sample.
@@ -201,6 +211,14 @@ impl Synth {
             ring: [Biquad::bandpass(1150.0, 14.0, sample_rate), Biquad::bandpass(2430.0, 18.0, sample_rate)],
             pop_tone: Biquad::bandpass(900.0, 0.8, sample_rate),
             starter_tone: Biquad::bandpass(2800.0, 2.0, sample_rate),
+            hiss_tone: Biquad::bandpass(4200.0, 1.2, sample_rate),
+            blowoff_tone: Biquad::bandpass(1900.0, 0.7, sample_rate),
+            turbine: [0.0; 2],
+            turbine_coeff: one_pole(1800.0, sample_rate),
+            fitted: 0.0,
+            whistle_phase: 0.0,
+            blowoff: 0.0,
+            blowoff_decay: (-1.0 / (0.2 * sample_rate)).exp(),
             tick: 0.0,
             kick: 0.0,
             tick_decay: (-1.0 / (0.0009 * sample_rate)).exp(),
@@ -283,12 +301,15 @@ impl Synth {
             }
         }
         let mut exhaust = [0.0f32; 2];
+        self.fitted += ((if self.engine.turbo { 1.0 } else { 0.0 }) - self.fitted) * (self.dt / 0.3).min(1.0);
         for b in 0..2 {
             let y = self.tailpipes[b].tick(self.primaries[b].tick(banks[b]));
             self.muffle[b] += (y - self.muffle[b]) * self.muffle_coeff;
+            self.turbine[b] += (self.muffle[b] - self.turbine[b]) * self.turbine_coeff;
+            let through = self.muffle[b] + (self.turbine[b] * 0.8 - self.muffle[b]) * self.fitted;
             // Sound radiated from the pipe's end follows the change in flow, which tilts the pulses toward the treble.
-            exhaust[b] = (self.muffle[b] - 0.55 * self.radiated[b]) * EXHAUST_GAIN;
-            self.radiated[b] = self.muffle[b];
+            exhaust[b] = (through - 0.55 * self.radiated[b]) * EXHAUST_GAIN;
+            self.radiated[b] = through;
         }
 
         // Intake: suction rings the airbox and drags rush through the restrictors.
@@ -325,7 +346,8 @@ impl Synth {
             starter = self.starter * (0.04 * whine * load + 0.03 * self.starter_tone.tick(self.rng.noise()));
         }
 
-        let common = intake + click + ring * 0.06 + starter;
+        let turbo = self.turbo_sound();
+        let common = intake + click + ring * 0.06 + starter + turbo;
         let left = exhaust[0] * 0.65 + exhaust[1] * 0.35 + common;
         let right = exhaust[0] * 0.35 + exhaust[1] * 0.65 + common;
 
@@ -333,6 +355,25 @@ impl Synth {
         self.level += ((if audible { 1.0 } else { 0.0 }) - self.level) * (self.dt / 0.05).min(1.0);
         let gain = OUTPUT_GAIN * self.level;
         (self.finish(0, left) * gain, self.finish(1, right) * gain)
+    }
+
+    /// The game turbo kit: the compressor's whistle and hiss rise with boost; the blow-off valve dumps with a hiss.
+    fn turbo_sound(&mut self) -> f32 {
+        let boost = self.engine.boost;
+        if self.engine.blowoff > 0.0 {
+            self.blowoff = self.blowoff.max(self.engine.blowoff);
+            self.engine.blowoff = 0.0;
+        }
+        if boost < 1e-3 && self.blowoff < 1e-4 {
+            return 0.0;
+        }
+        self.whistle_phase = (self.whistle_phase + (1800.0 + 6500.0 * boost) * self.dt).fract();
+        let ph = TAU * self.whistle_phase;
+        let whistle = (ph.sin() + 0.35 * (2.0 * ph).sin()) * 0.03 * boost * boost.sqrt();
+        let hiss = self.hiss_tone.tick(self.rng.noise()) * 0.05 * boost * self.engine.effective;
+        let dump = self.blowoff_tone.tick(self.rng.noise()) * 0.8 * self.blowoff;
+        self.blowoff *= self.blowoff_decay;
+        whistle + hiss + dump
     }
 
     /// Soft saturation, then a DC blocker.
@@ -448,6 +489,48 @@ mod tests {
         let revving = revving[revving.len() - 24_000..].to_vec();
         assert!(rms(&idle) > 0.01, "idle is audible: {}", rms(&idle));
         assert!(rms(&revving) > 1.5 * rms(&idle), "{} vs {}", rms(&revving), rms(&idle));
+    }
+
+    #[test]
+    fn the_game_turbo_whistles_on_boost_and_hisses_when_the_throttle_snaps_shut() {
+        // Full throttle until boost settles (its pitch would otherwise sweep), then a snap lift: the boosted stretch,
+        // the lift, and the whistle's pitch.
+        let run = |turbo: bool| {
+            let mut synth = Synth::new(RATE, 11);
+            synth.engine.turbo = turbo;
+            let mut out = Vec::new();
+            synth.start();
+            render_seconds(&mut synth, 3.0, &mut out);
+            synth.engine.set_pedal(1.0);
+            render_seconds(&mut synth, 3.0, &mut out);
+            let boosted = out[out.len() - 9600..].to_vec();
+            let pitch = 1800.0 + 6500.0 * synth.engine.boost;
+            synth.engine.set_pedal(0.0);
+            let mut lift = Vec::new();
+            render_seconds(&mut synth, 0.15, &mut lift);
+            (boosted, lift, pitch)
+        };
+        let (boosted, lift, pitch) = run(true);
+        let (plain, plain_lift, _) = run(false);
+        assert!(pitch > 7000.0, "spooled up: {pitch} Hz");
+        for buffer in [&boosted, &lift, &plain, &plain_lift] {
+            assert!(buffer.iter().all(|v| v.is_finite() && v.abs() < 1.0));
+        }
+        assert!(power(&boosted, pitch) > 5.0 * power(&plain, pitch), "whistle {} vs {}", power(&boosted, pitch), power(&plain, pitch));
+        assert!(rms(&lift) > 0.0 && rms(&plain_lift) > 0.0);
+    }
+
+    #[test]
+    fn the_blow_off_valve_hisses_and_dies_away() {
+        let hiss = |synth: &mut Synth, seconds: f32| (0..(seconds * RATE) as usize).map(|_| synth.turbo_sound()).collect::<Vec<_>>();
+        let mut synth = Synth::new(RATE, 13);
+        assert!(hiss(&mut synth, 0.05).iter().all(|&v| v == 0.0), "silent without boost or a blow-off");
+        synth.engine.blowoff = 0.9;
+        let burst = hiss(&mut synth, 0.1);
+        assert!(rms(&burst) > 0.08, "hiss {}", rms(&burst));
+        assert_eq!(synth.engine.blowoff, 0.0, "taken");
+        hiss(&mut synth, 1.5);
+        assert!(rms(&hiss(&mut synth, 0.1)) < 0.002, "gone");
     }
 
     #[test]

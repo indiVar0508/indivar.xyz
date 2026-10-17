@@ -73,17 +73,36 @@ pub extern "C" fn synth_rpm() -> f32 {
     synth().engine.rpm
 }
 
+/// What the engine gets from the throttle and idle control, 0 to 1.
+#[no_mangle]
+pub extern "C" fn synth_load() -> f32 {
+    synth().engine.effective
+}
+
+/// Fits or removes the game turbo kit. The real P60B40 is naturally aspirated.
+#[no_mangle]
+pub extern "C" fn synth_set_turbo(fitted: u32) {
+    synth().engine.turbo = fitted != 0;
+}
+
+/// Turbo boost, 0 to 1.
+#[no_mangle]
+pub extern "C" fn synth_boost() -> f32 {
+    synth().engine.boost
+}
+
 /// 0 off, 1 cranking, 2 running, 3 stopping.
 #[no_mangle]
 pub extern "C" fn synth_status() -> u32 {
     synth().engine.status as u32
 }
 
-/// Fills the kinematics frame for a crank angle (degrees) and returns it; see `timing::kinematics` for the layout.
+/// Fills the kinematics frame for a crank angle (degrees), engine load (0 to 1) and speed (rpm), and returns it; see
+/// `timing::kinematics` for the layout.
 #[no_mangle]
-pub extern "C" fn kin_update(crank: f32) -> *const f32 {
+pub extern "C" fn kin_update(crank: f32, load: f32, rpm: f32) -> *const f32 {
     let frame = unsafe { (*FRAME.0.get()).get_or_insert([0.0; KIN_LEN]) };
-    timing::kinematics(crank, frame);
+    timing::kinematics(crank, load, rpm, frame);
     frame.as_ptr()
 }
 

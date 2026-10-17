@@ -54,6 +54,18 @@ describe('p60-worklet.js', () => {
     expect(last().rpm).toBeGreaterThan(7000);
   });
 
+  it('fits the game turbo kit on command and reports boost and load', () => {
+    const processor = loadProcessor();
+    processor.port.onmessage!({ data: { type: 'turbo', value: true } });
+    processor.port.onmessage!({ data: { type: 'start' } });
+    render(processor, 3);
+    processor.port.onmessage!({ data: { type: 'throttle', value: 1 } });
+    render(processor, 2);
+    const last = processor.port.posted.at(-1) as { load: number; boost: number };
+    expect(last.load).toBeCloseTo(1, 1);
+    expect(last.boost).toBeGreaterThan(0.6);
+  });
+
   it('renders a render quantum larger than the crate block in pieces', () => {
     const processor = loadProcessor();
     processor.port.onmessage!({ data: { type: 'start' } });

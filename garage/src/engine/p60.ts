@@ -7,7 +7,7 @@ export const P60_WASM_URL = `${import.meta.env.BASE_URL}wasm/p60.wasm`;
 
 export type P60Exports = {
   memory: WebAssembly.Memory;
-  kin_update(crank: number): number;
+  kin_update(crank: number, load: number, rpm: number): number;
   kin_len(): number;
   p60_fire_angle(cylinder: number): number;
   p60_valve_centre(cylinder: number, exhaust: number): number;
@@ -30,7 +30,11 @@ export const FRAME = {
   intakeLift: (i: number) => 34 + i * 2,
   exhaustLift: (i: number) => 35 + i * 2,
   glow: (i: number) => 50 + i,
-  length: 58,
+  spark: (i: number) => 58 + i,
+  injection: (i: number) => 66 + i,
+  /** How far the exhaust pulse has run down the header (0 to 1), or -1. */
+  exhaustPulse: (i: number) => 74 + i,
+  length: 82,
 } as const;
 
 let bytes: Promise<ArrayBuffer> | null = null;
@@ -66,9 +70,9 @@ export class Kinematics {
     this.fireAngles = Array.from({ length: 8 }, (_, i) => wasm.p60_fire_angle(i + 1));
   }
 
-  /** The frame for a crank angle in degrees. The view is reused by the next call. */
-  frame(crank: number): Float32Array {
-    const at = this.wasm.kin_update(crank);
+  /** The frame for a crank angle in degrees, at an engine load (0 to 1) and speed. The view is reused by the next call. */
+  frame(crank: number, load = 0, rpm = 0): Float32Array {
+    const at = this.wasm.kin_update(crank, load, rpm);
     if (this.view?.buffer !== this.wasm.memory.buffer || this.view.byteOffset !== at) this.view = new Float32Array(this.wasm.memory.buffer, at, FRAME.length);
     return this.view;
   }

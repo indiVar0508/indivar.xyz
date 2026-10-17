@@ -16,6 +16,10 @@ const VISCOUS: f32 = 0.45;
 const PUMPING: f32 = 0.3;
 const IDLE_GAIN: f32 = 0.0004;
 const FLARE_RPM: f32 = 1300.0;
+/// Game turbo kit: extra torque at full boost, and how fast boost builds and falls (seconds).
+const BOOST_TORQUE: f32 = 0.4;
+const SPOOL_UP: f32 = 0.5;
+const SPOOL_DOWN: f32 = 0.3;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[repr(u32)]
@@ -54,6 +58,13 @@ pub struct Engine {
     pub elapsed: f32,
     /// Seconds since the throttle snapped shut from high rpm, while it stays shut; negative when not on the overrun.
     pub overrun: f32,
+    /// The game turbo kit is fitted. The real P60B40 is naturally aspirated.
+    pub turbo: bool,
+    /// Turbo boost, 0 to 1.
+    pub boost: f32,
+    /// Set when the blow-off valve opens, to the boost it dumps; the synthesizer takes it and clears it.
+    pub blowoff: f32,
+    blowoff_armed: bool,
     pedal: f32,
     catch_at: f32,
     flare: f32,
@@ -79,6 +90,10 @@ impl Engine {
             cut: false,
             elapsed: 0.0,
             overrun: -1.0,
+            turbo: false,
+            boost: 0.0,
+            blowoff: 0.0,
+            blowoff_armed: false,
             pedal: 0.0,
             catch_at: 0.7,
             flare: 0.0,
@@ -105,7 +120,7 @@ impl Engine {
 
     /// Stops dead, for when sound is switched off.
     pub fn reset(&mut self) {
-        *self = Self { angle: self.angle, ..Self::new() };
+        *self = Self { angle: self.angle, turbo: self.turbo, ..Self::new() };
     }
 
     pub fn set_pedal(&mut self, pedal: f32) {
@@ -149,7 +164,8 @@ impl Engine {
                 } else if self.rpm < LIMIT_RESUME {
                     self.cut = false;
                 }
-                let drive = if self.cut { 0.0 } else { TORQUE_GAIN * torque(self.rpm) * self.effective };
+                let boosted = 1.0 + BOOST_TORQUE * self.boost;
+                let drive = if self.cut { 0.0 } else { TORQUE_GAIN * torque(self.rpm) * self.effective * boosted };
                 self.rpm = (self.rpm + (drive - losses(self.rpm, self.effective)) * dt).max(0.0);
                 // Each firing kicks the crank a little: four per turn, most noticeable at idle.
                 speed = self.rpm * (1.0 + 0.015 * self.idleness() * (4.0 * self.angle.to_radians()).sin());
@@ -175,7 +191,27 @@ impl Engine {
                 }
             }
         }
+        self.spool(dt);
         self.angle = wrap720(self.angle + speed * 6.0 * dt);
+    }
+
+    /// Boost follows exhaust flow, with lag. Snapping the throttle shut under boost opens the blow-off valve.
+    fn spool(&mut self, dt: f32) {
+        // Exhaust keeps flowing through the turbine while the limiter cuts the spark.
+        let flow = if self.turbo && self.status == Status::Running {
+            ((self.rpm / LIMIT_RPM).powf(1.3) * self.effective * 1.6).min(1.0)
+        } else {
+            0.0
+        };
+        let tau = if flow > self.boost { SPOOL_UP } else { SPOOL_DOWN };
+        self.boost += (flow - self.boost) * (dt / tau).min(1.0);
+        if self.pedal > 0.5 {
+            self.blowoff_armed = true;
+        } else if self.pedal < 0.1 && self.blowoff_armed && self.boost > 0.25 {
+            self.blowoff_armed = false;
+            self.blowoff = self.boost;
+            self.boost *= 0.4;
+        }
     }
 }
 
@@ -244,6 +280,41 @@ mod tests {
         assert!(low > 1000.0, "dipped to {low}");
         assert!((engine.rpm - IDLE_RPM).abs() < 60.0, "settled at {}", engine.rpm);
         assert!(engine.overrun < 0.0 || engine.rpm < 3500.0);
+    }
+
+    #[test]
+    fn the_game_turbo_lags_then_boosts_and_blows_off_when_the_throttle_snaps_shut() {
+        let mut engine = idling();
+        engine.turbo = true;
+        engine.set_pedal(1.0);
+        run(&mut engine, 0.15);
+        assert!(engine.boost < 0.4, "lag: {}", engine.boost);
+        run(&mut engine, 1.5);
+        assert!(engine.boost > 0.7, "boost: {}", engine.boost);
+        engine.set_pedal(0.0);
+        run(&mut engine, 0.01);
+        assert!(engine.blowoff > 0.7, "blow-off: {}", engine.blowoff);
+        assert!(engine.boost < 0.4);
+    }
+
+    #[test]
+    fn the_turbo_revs_harder_and_the_real_engine_never_boosts() {
+        let to_8000 = |turbo: bool| {
+            let mut engine = idling();
+            engine.turbo = turbo;
+            run(&mut engine, 0.5); // a moment to spool at idle, which it can't
+            engine.set_pedal(1.0);
+            let mut seconds = 0.0;
+            while engine.rpm < 8000.0 {
+                engine.step(DT);
+                seconds += DT;
+                if !turbo {
+                    assert_eq!(engine.boost, 0.0);
+                }
+            }
+            seconds
+        };
+        assert!(to_8000(true) < to_8000(false));
     }
 
     #[test]

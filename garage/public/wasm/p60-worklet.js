@@ -1,5 +1,5 @@
 // The P60B40's sound, on the audio thread. The page passes in p60.wasm's bytes and sends commands; each block is
-// rendered into wasm memory and copied out, and engine speed is reported back about 45 times a second.
+// rendered into wasm memory and copied out, and engine speed, load and boost are reported back about 45 times a second.
 // Plain JavaScript: an AudioWorklet module is loaded by URL, outside the app's bundle.
 
 const REPORT_EVERY = 8; // blocks of 128 frames
@@ -8,6 +8,7 @@ const COMMANDS = {
   stop: (wasm) => wasm.synth_stop(),
   reset: (wasm) => wasm.synth_reset(),
   throttle: (wasm, value) => wasm.synth_set_throttle(value),
+  turbo: (wasm, value) => wasm.synth_set_turbo(value ? 1 : 0),
 };
 
 class P60Processor extends AudioWorkletProcessor {
@@ -36,7 +37,7 @@ class P60Processor extends AudioWorkletProcessor {
     const status = this.wasm.synth_status();
     if (status !== this.status || (status !== 0 && ++this.blocks % REPORT_EVERY === 0)) {
       this.status = status;
-      this.port.postMessage({ rpm: this.wasm.synth_rpm(), status });
+      this.port.postMessage({ rpm: this.wasm.synth_rpm(), load: this.wasm.synth_load(), boost: this.wasm.synth_boost(), status });
     }
     return true;
   }

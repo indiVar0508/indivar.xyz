@@ -1,6 +1,6 @@
 //! Renders a test drive to a 16-bit stereo WAV for listening and measurement:
 //! start and idle, three blips, a run to the limiter, the overrun back to idle, then switch-off.
-//! Usage: cargo run --release --example render -- out.wav
+//! Usage: cargo run --release --example render -- out.wav [--levels] [--turbo]
 use p60::synth::{Synth, MAX_FRAMES};
 use std::io::Write;
 
@@ -9,6 +9,7 @@ const RATE: u32 = 48_000;
 fn main() {
     let path = std::env::args().nth(1).unwrap_or_else(|| "p60.wav".into());
     let mut synth = Synth::new(RATE as f32, 1);
+    synth.engine.turbo = std::env::args().any(|a| a == "--turbo");
     let mut samples: Vec<i16> = Vec::new();
     let mut left: Vec<f32> = Vec::new();
     let script: &[(f32, f32)] = &[(0.0, 0.0), (4.0, 1.0), (4.25, 0.0), (5.5, 1.0), (5.75, 0.0), (7.0, 1.0), (7.3, 0.0), (8.5, 1.0), (11.0, 0.0), (15.0, -1.0)];
