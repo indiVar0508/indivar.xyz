@@ -25,11 +25,20 @@ function toggleInside(): void {
   setInside(!inside);
 }
 
+/** A button's full label, shortened on phones to a word that stays inside the full one (its accessible name). */
+const Label = ({ long, short }: { long: string; short: string }) => (
+  <>
+    <span className="label-long">{long}</span>
+    <span className="label-short">{short}</span>
+  </>
+);
+
 const typing = (target: EventTarget | null) => target instanceof HTMLElement && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));
 
-/** Engine speed, redrawn every frame from what the audio thread last reported. */
-function Tach() {
+/** Engine speed (and boost, with the game turbo kit), redrawn every frame from what the audio thread last reported. */
+function Tach({ turbo }: { turbo: boolean }) {
   const bar = useRef<HTMLSpanElement>(null);
+  const boost = useRef<HTMLSpanElement>(null);
   const digits = useRef<HTMLSpanElement>(null);
   useEffect(() => {
     let shown = engineLive.rpm;
@@ -38,6 +47,7 @@ function Tach() {
       shown += (engineLive.rpm - shown) * Math.min(1, (now - last) / 60);
       last = now;
       bar.current!.style.transform = `scaleX(${Math.min(1, shown / TACH_MAX)})`;
+      if (boost.current) boost.current.style.transform = `scaleX(${engineLive.boost})`;
       digits.current!.textContent = (Math.round(shown / 10) * 10).toLocaleString('en-US');
       frame = requestAnimationFrame(draw);
     });
@@ -47,6 +57,7 @@ function Tach() {
     <p className="tach">
       <span className="tach-reading"><span ref={digits}>0</span> rpm</span>
       <span className="tach-track" aria-hidden="true"><span ref={bar} className="tach-bar" /></span>
+      {turbo && <span className="tach-boost" aria-hidden="true"><span ref={boost} /></span>}
     </p>
   );
 }
@@ -99,7 +110,7 @@ function RevButton() {
       onBlur={() => hold(false)}
       onContextMenu={(event) => event.preventDefault()}
     >
-      Hold to rev <kbd>R</kbd>
+      <Label long="Hold to rev" short="Rev" /> <kbd>R</kbd>
     </button>
   );
 }
@@ -109,18 +120,30 @@ export function EngineDock() {
   const engine = useGarage((state) => state.engine);
   const error = useGarage((state) => state.engineError);
   const inside = useGarage((state) => state.inside);
+  const turbo = useGarage((state) => state.turbo);
   const stopped = engine === 'off' || engine === 'stopping';
   return (
     <section className="engine-dock" aria-label="Engine">
-      <button type="button" className="hud-button" onClick={stopped ? () => void startEngine() : () => audio.stopEngine()}>
-        {stopped ? 'Start engine' : engine === 'starting' ? 'Starting…' : 'Stop engine'}
-      </button>
-      {!stopped && <Tach />}
+      {stopped ? (
+        <button type="button" className="hud-button" aria-label="Start engine" onClick={() => void startEngine()}>
+          <Label long="Start engine" short="Start" />
+        </button>
+      ) : (
+        <button type="button" className="hud-button" aria-label={engine === 'starting' ? 'Starting…' : 'Stop engine'} onClick={() => audio.stopEngine()}>
+          <Label long={engine === 'starting' ? 'Starting…' : 'Stop engine'} short={engine === 'starting' ? 'Starting…' : 'Stop'} />
+        </button>
+      )}
+      {!stopped && <Tach key={String(turbo)} turbo={turbo} />}
       {engine === 'running' && <RevButton />}
-      <button type="button" className="hud-button" aria-pressed={inside} onClick={toggleInside}>
-        Look inside
+      <button type="button" className="hud-button" aria-label="Look inside" aria-pressed={inside} onClick={toggleInside}>
+        <Label long="Look inside" short="Inside" />
       </button>
-      {error && <p className="engine-error" role="status">{error}</p>}
+      <button type="button" className="hud-button engine-turbo" aria-label="Game turbo" aria-pressed={turbo} onClick={() => useGarage.getState().setTurbo(!turbo)}>
+        <Label long="Game turbo" short="Turbo" />
+      </button>
+      <p className="engine-note" role="status">
+        {error ?? (turbo ? 'Game turbo kit fitted. It’s only in Most Wanted: the real P60B40 has no turbo.' : '')}
+      </p>
     </section>
   );
 }

@@ -26,6 +26,8 @@ export type GarageStore = {
   engineError: string | null;
   /** The engine is shown as an x-ray with its moving parts inside. Only while the hood is open. */
   inside: boolean;
+  /** The game turbo kit is fitted. The real P60B40 is naturally aspirated; this is not remembered between visits. */
+  turbo: boolean;
   dispatch: (action: ViewAction) => void;
   setQuality: (quality: Quality) => void;
   setReady: () => void;
@@ -39,6 +41,7 @@ export type GarageStore = {
   setEngine: (status: EngineStatus) => void;
   setEngineError: (message: string | null) => void;
   setInside: (inside: boolean) => void;
+  setTurbo: (fitted: boolean) => void;
 };
 
 const inBrowser = typeof window !== 'undefined';
@@ -60,6 +63,7 @@ export const useGarage = create<GarageStore>()((set) => ({
   engine: 'off',
   engineError: null,
   inside: false,
+  turbo: false,
   dispatch: (action) =>
     set((state) => {
       const view = reduceView(state.view, action);
@@ -78,4 +82,5 @@ export const useGarage = create<GarageStore>()((set) => ({
   setEngine: (engine) => set({ engine }),
   setEngineError: (engineError) => set({ engineError }),
   setInside: (inside) => set((state) => ({ inside: inside && isHoodOpen(state.view) })),
+  setTurbo: (turbo) => set({ turbo }),
 }));

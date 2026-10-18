@@ -80,7 +80,7 @@ The switch is off by default and is not remembered between visits.
   - `Injector_<n>` tips;
   - `Flow_*` paths with at least two points.
   - The existing hotspot and budget rules still apply.
-- **Moving parts:** `Plug_<n>`, `Flywheel` (turns with the crank), `Starter_pinion`.
+- **Moving parts:** `Plugs` and `Starter_pinion`, both pivots holding their meshes.
 - **Turbo GLB:** the `Turbo` root, `Compressor_left` and `Compressor_right` pivots, under 1 MB and 30,000 triangles.
 - **Tests:**
   - The crate's tests cover boost lag, blow-off and the advance curve.
@@ -89,6 +89,26 @@ The switch is off by default and is not remembered between visits.
   - Playwright switches the kit on and checks boost rises while revving, and checks the x-ray effects appear.
 - **Budget:** JavaScript stays under 450 KB gzip.
 
-## 4. Out of scope
+## 4. As built
+
+- **Flywheel.** The flywheel, its 120-tooth ring gear and the clutch turn with the crank, so they are part of the
+  `Crank` mesh rather than a node of their own. The 11-tooth starter pinion is phased to sit in a ring-gear gap.
+- **Turbo layout.** The turbos sit low behind the collectors, 1–2 cm clear of the firewall, the strut towers and the
+  bay floor. The charge pipes run outside the heads at x ±0.44 and arc over the belt drive into the inlets.
+- **Measured turbo sound.** In a 48 kHz test drive:
+  - the limiter peaks at 0.55;
+  - the exhaust's spectral centroid drops from about 1.9 kHz to 1.0 kHz through the turbines;
+  - the blow-off hiss is 0.08 RMS or more.
+- **Phones.** The engine controls show short words ("Start", "Inside", "Turbo", "Rev"), while their accessible names
+  stay in full, so the HUD fits two rows with the engine off.
+- **Sizes and budget.**
+  - Engine: 78,364 triangles.
+  - Moving parts: 38,944 triangles.
+  - Turbo kit: 9,576 triangles and 0.1 MB.
+  - JavaScript: 445 of 450 KB gzip, so little headroom is left.
+- **Test server.** Playwright reuses whatever is already serving on port 4176. When another project holds that port,
+  run the suite against a preview of this one, for example `GARAGE_URL=http://localhost:4177/`.
+
+## 5. Out of scope
 
 Photo mode, the exploded view, and driving (Phase 3, with Rapier).

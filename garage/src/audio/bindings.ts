@@ -29,6 +29,7 @@ export function bindAudio(): void {
     }
     if (state.ownTrack && state.ownTrack !== previous.ownTrack && state.radioOpen) setRadioOpen(false);
     if (radioPlaying(state) !== radioPlaying(previous)) audio.setRadioPlaying(radioPlaying(state));
+    if (state.turbo !== previous.turbo) audio.setTurbo(state.turbo);
   });
   if (readSoundPref()) {
     // Browsers block audio until a gesture, so a remembered "on" waits for the first one, then stops listening.

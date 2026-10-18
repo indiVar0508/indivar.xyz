@@ -115,3 +115,42 @@ test('keeps the engine controls clear of the radio player and the panel', async 
   }
   expect(errors).toEqual([]);
 });
+
+const probe = (page: Page, name: string) => page.evaluate((n) => (window as unknown as Record<string, (() => unknown) | undefined>)[n]?.() ?? null, name);
+
+test('turns the belt drive and shows fuel, spark, air, exhaust, oil and coolant inside', async ({ page }, info) => {
+  const errors = await open(page);
+  await page.getByRole('button', { name: 'Open the hood' }).click();
+  await page.getByRole('button', { name: 'Start engine' }).click();
+  await expect.poll(() => state(page, 'engine'), { timeout: 20_000 }).toBe('running');
+  const belt = (await probe(page, 'garageBelt')) as number[];
+  await page.waitForTimeout(300);
+  const later = (await probe(page, 'garageBelt')) as number[];
+  later.forEach((angle, i) => expect(angle, `pulley ${i}`).not.toBe(belt[i]));
+  await page.getByRole('button', { name: 'Look inside' }).click();
+  await expect.poll(() => probe(page, 'garageFlows'), { timeout: 30_000 }).toBeGreaterThan(30);
+  await page.waitForTimeout(1500);
+  await page.screenshot({ path: info.outputPath('inside-flows.png') });
+  expect(errors).toEqual([]);
+});
+
+test('fits the game turbo kit: labelled, spooling with revs, and off again', async ({ page }, info) => {
+  const errors = await open(page);
+  await page.getByRole('button', { name: 'Open the hood' }).click();
+  await page.getByRole('button', { name: 'Game turbo' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'only in Most Wanted' })).toBeVisible();
+  await expect.poll(() => probe(page, 'garageTurbo'), { timeout: 30_000 }).not.toBeNull();
+  await page.getByRole('button', { name: 'Start engine' }).click();
+  await expect.poll(() => state(page, 'engine'), { timeout: 20_000 }).toBe('running');
+  await hold(page, 'Hold to rev', 1500);
+  const boost = await page.evaluate(() => (window as unknown as { garageEngine: { boost: number } }).garageEngine.boost);
+  expect(boost).toBeGreaterThan(0.4);
+  await page.screenshot({ path: info.outputPath('turbo.png') });
+  await page.mouse.up();
+  await page.getByRole('button', { name: 'Look inside' }).click();
+  await page.waitForTimeout(1500);
+  await page.screenshot({ path: info.outputPath('turbo-inside.png') });
+  await page.getByRole('button', { name: 'Game turbo' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'only in Most Wanted' })).toHaveCount(0);
+  expect(errors).toEqual([]);
+});

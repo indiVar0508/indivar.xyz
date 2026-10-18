@@ -1,51 +1,106 @@
-import { useFrame, useLoader } from '@react-three/fiber';
+import { useFrame, useLoader, useThree } from '@react-three/fiber';
 import { Component, use, useLayoutEffect, useMemo, useRef, type ReactNode } from 'react';
-import type { Object3D } from 'three';
+import { Vector3 } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { engineLive } from '../audio/engineSound';
 import { QA } from '../qa';
-import { poseInternals, prepareInternals } from './internals';
+import { FlowField, readFlows, type FlowKind, type FlowPath } from './flows';
+import { cylinderLayout } from './geometry';
+import { poseInternals, prepareInternals, type InternalsRig } from './internals';
 import { insideLive } from './live';
-import { loadKinematics } from './p60';
+import { slowStep } from './motion';
+import { FRAME, loadKinematics } from './p60';
+import type { EngineRig } from './prepareEngine';
 
 export const INTERNALS_URL = `${import.meta.env.BASE_URL}models/p60b40-internals.glb`;
 
-/** The x-ray runs this many times slower than the engine, so each stroke can be followed. */
-export const SLOW_MOTION = 40;
+/** How far up the bore each plug's spark gap sits. */
+const SPARK_HEIGHT = 0.2515;
+/** Metres per second each fluid moves in the x-ray at idle; it speeds up with rpm. */
+const SPEED: Partial<Record<FlowKind, number>> = { air: 0.3, exhaust: 0.5, oil: 0.06, fuel: 0.04, coolant: 0.08, spray: 0.25 };
+
+/** Paths the page adds to the engine's own: each injector's spray onto its intake valve, and each plug's spark. */
+function sprayAndSparks(rig: EngineRig, parts: InternalsRig): FlowPath[] {
+  return cylinderLayout().flatMap(({ number, axis, center }, i) => {
+    const valve = parts.valves.find((v) => v.cylinder === i && !v.exhaust)!.rest;
+    const gap = new Vector3(...axis).multiplyScalar(SPARK_HEIGHT).setZ(center[2]);
+    return [
+      { name: `Spray_${number}`, kind: 'spray' as const, cylinder: number, points: [rig.injectors[i]!.clone(), valve.clone()] },
+      { name: `Spark_${number}`, kind: 'spark' as const, cylinder: number, points: [gap, gap.clone().addScaledVector(new Vector3(...axis), 0.002)] },
+    ];
+  });
+}
 
 /**
- * The moving parts, inside the engine node, posed every frame from p60.wasm's kinematics. The crank turns at the
- * engine's speed slowed by SLOW_MOTION; cylinders flash as they fire while the engine burns fuel.
+ * The moving parts, inside the engine node, posed every frame from p60.wasm's kinematics, with the fuel, air,
+ * exhaust, oil and coolant that move through them. The crank turns at the engine's speed slowed by SLOW_MOTION.
  */
-function MovingParts({ engine }: { engine: Object3D }) {
+function MovingParts({ rig }: { rig: EngineRig }) {
   const gltf = useLoader(GLTFLoader, INTERNALS_URL, (loader) => loader.setMeshoptDecoder(MeshoptDecoder));
   const kinematics = use(loadKinematics());
-  const rig = useMemo(() => prepareInternals(gltf.scene), [gltf]);
+  const parts = useMemo(() => prepareInternals(gltf.scene), [gltf]);
+  const flows = useMemo(() => {
+    const engine = [...Object.values(rig.parts).flatMap(readFlows), ...sprayAndSparks(rig, parts)];
+    return { engine: new FlowField(engine), bay: new FlowField(readFlows(rig.bay)), paths: [...engine, ...readFlows(rig.bay)] };
+  }, [rig, parts]);
   const crank = useRef(insideLive.crank);
+  const travelled = useRef<Partial<Record<FlowKind, number>>>({});
+  const size = useThree((state) => state.size);
+  const camera = useThree((state) => state.camera);
 
   useLayoutEffect(() => {
-    engine.add(rig.root);
-    poseInternals(rig, kinematics.frame(crank.current), false);
-    if (QA) Object.assign(window, { garagePistons: () => rig.pistons.map((piston) => piston.position.toArray()) });
+    rig.engine.add(parts.root, flows.engine.group);
+    rig.bay.add(flows.bay.group);
+    poseInternals(parts, kinematics.frame(crank.current), false);
+    if (QA) {
+      Object.assign(window, {
+        garagePistons: () => parts.pistons.map((piston) => piston.position.toArray()),
+        garageFlows: () => flows.engine.shown() + flows.bay.shown(),
+      });
+    }
     return () => {
-      engine.remove(rig.root);
+      rig.engine.remove(parts.root, flows.engine.group);
+      rig.bay.remove(flows.bay.group);
       insideLive.firing = 0;
     };
-  }, [engine, rig, kinematics]);
+  }, [rig, parts, flows, kinematics]);
 
-  useFrame((_, dt) => {
-    const burning = engineLive.status === 'running';
-    crank.current = (crank.current + (engineLive.rpm / SLOW_MOTION) * 6 * Math.min(dt, 0.1)) % 720;
-    poseInternals(rig, kinematics.frame(crank.current), burning);
+  useFrame((state, dt) => {
+    const { rpm, load, status } = engineLive;
+    const running = status !== 'off';
+    const burning = status === 'running';
+    const step = Math.min(dt, 0.1);
+    crank.current = (crank.current + slowStep(rpm, step)) % 720;
+    const frame = kinematics.frame(crank.current, load, rpm);
+    poseInternals(parts, frame, burning);
     insideLive.crank = crank.current;
     insideLive.firing = burning ? kinematics.firing(crank.current) : 0;
+
+    const pace = rpm / 1500;
+    for (const kind of Object.keys(SPEED) as FlowKind[]) travelled.current[kind] = (travelled.current[kind] ?? 0) + SPEED[kind]! * pace * step;
+    for (const { name, kind, cylinder } of flows.paths) {
+      const field = flows.engine.has(name) ? flows.engine : flows.bay;
+      const i = (cylinder ?? 1) - 1;
+      const along = travelled.current[kind] ?? 0;
+      if (kind === 'exhaust' && cylinder) field.slug(name, frame[FRAME.exhaustPulse(i)]!, burning ? 1 : 0.35);
+      else if (kind === 'air' && cylinder) field.stream(name, along, running ? frame[FRAME.intakeLift(i)]! / 0.012 : 0);
+      else if (kind === 'air') field.stream(name, along, running ? 0.25 + 0.75 * load : 0);
+      else if (kind === 'spray') field.stream(name, along, burning ? frame[FRAME.injection(i)]! : 0);
+      else if (kind === 'spark') field.stream(name, 0, burning ? frame[FRAME.spark(i)]! : 0);
+      else field.stream(name, along, running ? 0.7 : 0);
+    }
+    const scale = size.height * state.viewport.dpr * 0.5 * camera.projectionMatrix.elements[5]!;
+    for (const field of [flows.engine, flows.bay]) {
+      field.setScale(scale);
+      field.commit();
+    }
   });
   return null;
 }
 
 /** If the parts can't load, the x-ray simply stays empty; the rest of the garage carries on. */
-class Optional extends Component<{ children: ReactNode }, { failed: boolean }> {
+export class Optional extends Component<{ children: ReactNode }, { failed: boolean }> {
   state = { failed: false };
   static getDerivedStateFromError() {
     return { failed: true };
@@ -55,10 +110,10 @@ class Optional extends Component<{ children: ReactNode }, { failed: boolean }> {
   }
 }
 
-export function Internals({ engine }: { engine: Object3D }) {
+export function Internals({ rig }: { rig: EngineRig }) {
   return (
     <Optional>
-      <MovingParts engine={engine} />
+      <MovingParts rig={rig} />
     </Optional>
   );
 }

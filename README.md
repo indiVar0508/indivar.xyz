@@ -92,7 +92,9 @@ The P60B40 and its engine bay are modelled by a script, not downloaded: `npm run
 
 - `npm run build:wasm` builds `garage/public/wasm/p60.wasm` (needs Rust and `rustup target add wasm32-unknown-unknown`) after running `cargo test`. The binary is committed, so the site build needs no Rust; `npm test` fails if it is older than the crate's sources.
 - `npm run build:internals` models the moving parts with `garage/tools/blender/build_internals.py` and writes `garage/public/models/p60b40-internals.glb`. The cam lobes are cut from the crate's timing, and `npm test` checks they still meet their valves at peak lift.
-- `cargo run --release --example render -- out.wav` (in `garage/crates/p60`) renders a test drive to a WAV file and prints each phase's level and spectrum, for listening to and tuning the sound.
+- `cargo run --release --example render -- out.wav [--turbo]` (in `garage/crates/p60`) renders a test drive to a WAV file and prints each phase's level and spectrum, for listening to and tuning the sound.
+- With the hood open the belt drive turns and the throttles open. In the x-ray, each injector sprays, each plug sparks, and air, exhaust, fuel, oil and coolant move along their pipes. The engine model carries each pipe's centreline (`Flow_*` nodes) for that.
+- "Game turbo" bolts on a twin-turbo kit that exists only in *Most Wanted* (the real engine is naturally aspirated), with spool whistle and blow-off in the sound. `npm run build:turbo` models it with `garage/tools/blender/build_turbo.py`.
 
 ### Most Wanted radio
 

@@ -82,7 +82,12 @@ body:has(.radio) .engine-dock { max-width: calc(100% - 436px); }
 .engine-rev { touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .engine-rev:active { border-color: var(--amber); background: rgba(255, 179, 92, 0.22); }
 .engine-rev kbd { margin-left: 6px; padding: 1px 5px; border: 1px solid var(--line); font: 11px/1.4 var(--mono); }
-.engine-error { flex-basis: 100%; margin: 0; font: 11px/1.4 var(--mono); color: var(--amber); text-align: right; }
+.tach-boost { display: block; height: 3px; background: rgba(255, 179, 92, 0.15); }
+.tach-boost span { display: block; height: 100%; background: var(--amber); transform: scaleX(0); transform-origin: left; }
+.engine-turbo[aria-pressed='true'] { border-color: var(--amber); background: rgba(255, 179, 92, 0.22); }
+.label-short { display: none; }
+.engine-note { flex-basis: 100%; margin: 0; font: 11px/1.4 var(--mono); color: var(--amber); text-align: right; }
+.engine-note:empty { display: none; }
 .firing { margin: 0 0 14px; }
 .firing figcaption, .firing p { font: 11px/1.4 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
 .firing p { margin: 6px 0 0; letter-spacing: 0; text-transform: none; }
@@ -100,7 +105,8 @@ body:has(.radio) .engine-dock { max-width: calc(100% - 436px); }
      compact, so the engine stays in view even with the radio docked at the top. */
   .hud-actions .hud-button { padding: 8px 10px; font-size: 13px; }
   .engine-dock, body:has(.radio) .engine-dock { display: contents; }
-  .engine-rev kbd { display: none; }
+  .engine-rev kbd, .label-long { display: none; }
+  .label-short { display: inline; }
   .tach { width: 84px; padding: 4px 9px; }
   .tach-reading { font-size: 14px; }
 }

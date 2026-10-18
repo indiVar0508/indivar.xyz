@@ -329,10 +329,13 @@ def merge(*meshes):
 # ---------------------------------------------------------------- objects and parts
 
 PARTS = {}
+PIVOTS = {}  # node name -> (part, glTF engine-space point, objects, extras): parts the page moves, such as pulleys
+MARKERS = []  # (node name, part, glTF point, extras): empties the page reads, such as injector tips and flow paths
 
 
-def make(part, name, bm, mat, matrix=None, colors=None, sharp=35):
-    """Turns a glTF-space bmesh into an object in `part`. `colors` maps a glTF-space position to linear RGB."""
+def make(part, name, bm, mat, matrix=None, colors=None, sharp=35, pivot=None):
+    """Turns a glTF-space bmesh into an object in `part`. `colors` maps a glTF-space position to linear RGB.
+    With `pivot` = (node name, point), the object joins that moving pivot instead of the part's single mesh."""
     if matrix is not None:
         place(bm, matrix)
     if colors is not None:
@@ -353,8 +356,21 @@ def make(part, name, bm, mat, matrix=None, colors=None, sharp=35):
     mesh.materials.append(MAT[mat])
     obj = bpy.data.objects.new(name, mesh)
     bpy.context.scene.collection.objects.link(obj)
-    PARTS.setdefault(part, []).append(obj)
+    if pivot is None:
+        PARTS.setdefault(part, []).append(obj)
+    else:
+        PIVOTS.setdefault(pivot[0], (part, pivot[1], [], pivot[2] if len(pivot) > 2 else {}))[2].append(obj)
     return obj
+
+
+def marker(name, part, point, **extras):
+    MARKERS.append((name, part, tuple(point), extras))
+
+
+def flow(kind, name, part, points, **extras):
+    """A pipe's centreline, in the direction its fluid moves, for the page to animate flow along. The points are
+    flattened (x, y, z, x, y, z, ...), in the space of the part they belong to."""
+    MARKERS.append((f"Flow_{kind}_{name}", part, (0.0, 0.0, 0.0), {"kind": kind, "points": [round(v, 5) for p in points for v in p], **extras}))
 
 
 def bank_point(side, x, y, z):
@@ -363,6 +379,7 @@ def bank_point(side, x, y, z):
 
 # ---------------------------------------------------------------- the engine (engine space)
 
+STARTER = (0.11, -0.085)  # illustrative: its axis, 0.139 m from the crank's, where an 11-tooth pinion meets a 120-tooth ring gear
 BLOCK_HALF = [(0.207, -0.115), (0.207, 0.010), (0.172, 0.054), (0.237, 0.119), (0.117, 0.239), (0.0, 0.122)]
 Z_REAR, Z_FRONT = -0.27, 0.245
 
@@ -390,6 +407,12 @@ def build_block(cylinders):
         make("layout", "mount_arm", box(0.11, 0.05, 0.08, bevel=0.008), "cast", at(side * 0.262, -0.035, 0.05))
         make("layout", "mount_rubber", cylinder(0.034, 0.05, segments=20, bevel=0.004), "rubber", at(side * 0.315, -0.085, 0.05) @ Y_UP)
         make("layout", "knock_sensor", cylinder(0.014, 0.02, segments=12, bevel=0.002), "black", bank(side) @ at(0.088, 0.12, -0.05) @ X_OUT)
+    # Starter motor behind the block, low on the left, its pinion reaching forward to the flywheel's ring gear.
+    sx, sy = STARTER
+    make("layout", "starter", lathe([(0.0, -0.32), (0.038, -0.32), (0.042, -0.325), (0.042, -0.39), (0.036, -0.398), (0.0, -0.398)], segments=28), "black", at(sx, sy, 0))
+    make("layout", "starter_nose", lathe([(0.0, -0.312), (0.03, -0.312), (0.03, -0.32), (0.0, -0.32)], segments=24), "cast", at(sx, sy, 0))
+    make("layout", "starter_solenoid", cylinder(0.021, 0.075, segments=20, bevel=0.003), "black", at(sx + 0.035, sy + 0.045, -0.36))
+    make("layout", "starter_terminal", bolt(0.005), "machined", at(sx + 0.035, sy + 0.045, -0.3975) @ Matrix.Rotation(math.pi, 4, "X"))
 
 
 def build_heads(cylinders):
@@ -447,12 +470,18 @@ def build_front():
     for k, (x, y) in enumerate(mirrored(TIMING_HALF)):
         make("crank", "timing_case_bolt", bolt(0.0055), "machined", at(x * 0.93, y * 0.93 + 0.01, 0.30))
     # Crank damper with its rubber ring, then the belt pulley on the belt plane.
+    # Everything on the belt turns: each pulley is a pivot the page spins at its belt ratio.
+    spin = {name: (f"Spin_{name}", (x, y, BELT_Z), {"radius": r}) for name, (x, y, r) in PULLEYS.items()}
     make("crank", "damper", lathe([(0.0, 0.30), (0.035, 0.30), (0.035, 0.315), (0.082, 0.315), (0.085, 0.32), (0.085, 0.355),
-                                   (0.082, 0.36), (0.03, 0.36), (0.03, BELT_Z - 0.014), (0.0, BELT_Z - 0.014)], segments=48), "machined")
-    make("crank", "damper_rubber", lathe([(0.0845, 0.333), (0.0855, 0.335), (0.0855, 0.341), (0.0845, 0.343)], segments=48), "rubber")
+                                   (0.082, 0.36), (0.03, 0.36), (0.03, BELT_Z - 0.014), (0.0, BELT_Z - 0.014)], segments=48), "machined", pivot=spin["crank"])
+    make("crank", "damper_rubber", lathe([(0.0845, 0.333), (0.0855, 0.335), (0.0855, 0.341), (0.0845, 0.343)], segments=48), "rubber", pivot=spin["crank"])
     for name, (x, y, r) in PULLEYS.items():
-        make("crank", f"pulley_{name}", pulley(r), "machined" if name == "crank" else "black", at(x, y, 0))
-        make("crank", f"pulley_bolt_{name}", bolt(0.008), "machined", at(x, y, BELT_Z + 0.014))
+        make("crank", f"pulley_{name}", pulley(r), "machined" if name == "crank" else "black", at(x, y, 0), pivot=spin[name])
+        make("crank", f"pulley_bolt_{name}", bolt(0.008), "machined", at(x, y, BELT_Z + 0.014), pivot=spin[name])
+        if r > 0.045:  # bolts round the big pulleys' faces, so their turning shows
+            for k in range(4 if name == "crank" else 3):
+                a = 2 * math.pi * k / (4 if name == "crank" else 3)
+                make("crank", f"pulley_face_bolt_{name}", bolt(0.0045), "machined", at(x + 0.6 * r * math.cos(a), y + 0.6 * r * math.sin(a), BELT_Z + 0.014), pivot=spin[name])
     make("crank", "belt", belt(list(PULLEYS.values()), BELT_Z), "rubber")
     # Alternator behind its pulley, finned, on a bracket off the timing case.
     ax, ay, _ = PULLEYS["alternator"]
@@ -494,13 +523,23 @@ def build_intake(cylinders):
                                                  (0.044, 0.121), (0.042, 0.112), (0.042, 0.06)], segments=40), "machined", inlet)
         # Inside: the throat narrows to the 30.4 mm restrictor (verified: two 30.4 mm restrictors).
         make("restrictors", "restrictor", lathe([(0.042, 0.06), (0.04, 0.03), (0.0152, 0.02), (0.0152, -0.01), (0.0, -0.01)], segments=40), "black", inlet)
+    for side in (-1, 1):
+        mouth, axis = Vector((side * 0.105, 0.366, 0.24)), Vector((side * 0.12, -0.02, 1.0)).normalized()
+        flow("air", f"inlet_{'left' if side > 0 else 'right'}", "restrictors",
+             [mouth + axis * 0.3, mouth + axis * 0.12, mouth, mouth - axis * 0.05, Vector((side * 0.06, 0.39, 0.05))])
     for c in cylinders:
         side = 1 if c["bank"] == "left" else -1
         cz = c["center"][2]
         port = bank_point(side, -0.104, 0.31, cz)
         make("restrictors", "runner", tube([port, Vector((side * 0.122, 0.296, cz)), Vector((side * 0.098, 0.31, cz))], 0.02, sides=14), "cast")
-        make("restrictors", "throttle_body", cylinder(0.023, 0.03, segments=24, bevel=0.003), "machined",
-             frame((side * 0.098, 0.314, cz), (-side * 0.45, 1.0, 0)))
+        body, axis = Vector((side * 0.098, 0.314, cz)), Vector((-side * 0.45, 1.0, 0)).normalized()
+        make("restrictors", "throttle_body", cylinder(0.023, 0.03, segments=24, bevel=0.003), "machined", frame(tuple(body), tuple(axis)))
+        # The butterfly inside, shut across the bore; the page turns it about z as the throttle opens.
+        disc = cylinder(0.0205, 0.0015, segments=20)
+        place(disc, frame((0, 0, 0), tuple(axis)))
+        make("restrictors", "butterfly", merge(disc, cylinder(0.0025, 0.05, segments=8)), "machined", at(*body), pivot=(f"Throttle_{c['number']}", tuple(body)))
+        flow("air", f"runner_{c['number']}", "restrictors", [body + axis * 0.05, body, Vector((side * 0.122, 0.296, cz)), port, bank_point(side, -0.017, 0.252, cz)],
+             cylinder=c["number"])
     for side in (-1, 1):
         z = [c["center"][2] for c in cylinders if (c["bank"] == "left") == (side > 0)]
         make("restrictors", "throttle_shaft", cylinder(0.004, max(z) - min(z) + 0.07, segments=10), "machined", at(side * 0.126, 0.302, sum(z) / 4))
@@ -508,19 +547,34 @@ def build_intake(cylinders):
 
 def build_fuel(cylinders):
     for side in (-1, 1):
-        z = [c["center"][2] for c in cylinders if (c["bank"] == "left") == (side > 0)]
+        own = [c for c in cylinders if (c["bank"] == "left") == (side > 0)]
+        z = [c["center"][2] for c in own]
         mid, span = sum(z) / 4, max(z) - min(z) + 0.14
         make("fuel", "fuel_rail", box(0.016, 0.016, span, bevel=0.003), "blue", at(side * 0.172, 0.336, mid))
         for end in (-1, 1):
             make("fuel", "rail_fitting", cylinder(0.011, 0.02, segments=6, bevel=0.002), "red", at(side * 0.172, 0.336, mid + end * (span / 2 + 0.01)))
-        for cz in z:
-            make("fuel", "injector", cylinder(0.0075, 0.036, segments=14, bevel=0.002), "black", frame((side * 0.158, 0.318, cz), (-side * 0.5, 0.86, 0)))
+        flow("fuel", f"rail_{'left' if side > 0 else 'right'}", "fuel", [Vector((side * 0.172, 0.336, mid - span / 2)), Vector((side * 0.172, 0.336, mid + span / 2))])
+        # The injector harness: a trunk along each rail, a branch and plug to every injector, back to the bulkhead.
+        make("fuel", "injector_harness", tube([Vector((side * 0.19, 0.362, max(z) + 0.04)), Vector((side * 0.19, 0.362, min(z) - 0.03)),
+                                               Vector((side * 0.2, 0.372, min(z) - 0.1)), Vector((side * 0.14, 0.4, -0.33))], 0.007, sides=8, resolution=4), "black")
+        for c in own:
+            cz = c["center"][2]
+            centre, direction = Vector((side * 0.158, 0.318, cz)), Vector((-side * 0.5, 0.86, 0)).normalized()
+            make("fuel", "injector", cylinder(0.0075, 0.036, segments=14, bevel=0.002), "black", frame(tuple(centre), tuple(direction)))
             make("fuel", "injector_clip", cylinder(0.0085, 0.006, segments=14), "blue", frame((side * 0.164, 0.328, cz), (-side * 0.5, 0.86, 0)))
+            top = centre + direction * 0.018
+            make("fuel", "injector_plug", box(0.013, 0.011, 0.015, bevel=0.002), "black", frame(tuple(top + direction * 0.007), tuple(direction)))
+            make("fuel", "injector_branch", tube([top + direction * 0.013, Vector((side * 0.172, 0.358, cz)), Vector((side * 0.19, 0.362, cz))], 0.0028, sides=6, resolution=3), "black")
+            marker(f"Injector_{c['number']}", "fuel", centre - direction * 0.018)
     zl = [c["center"][2] for c in cylinders if c["bank"] == "left"]
     zr = [c["center"][2] for c in cylinders if c["bank"] == "right"]
     rear_l, rear_r = min(zl) - 0.08, min(zr) - 0.08
-    make("fuel", "fuel_feed", tube([Vector((0.172, 0.336, rear_l)), Vector((0.2, 0.32, rear_l - 0.05)), Vector((0.33, 0.29, -0.35)), Vector((0.42, 0.3, -0.395))], 0.0075, sides=12), "braided")
-    make("fuel", "fuel_crossover", tube([Vector((-0.172, 0.336, rear_r)), Vector((-0.12, 0.3, -0.3)), Vector((0.12, 0.3, -0.3)), Vector((0.172, 0.336, rear_l))], 0.0065, sides=12), "braided")
+    feed = [Vector((0.172, 0.336, rear_l)), Vector((0.2, 0.32, rear_l - 0.05)), Vector((0.33, 0.29, -0.35)), Vector((0.42, 0.3, -0.395))]
+    crossover = [Vector((0.172, 0.336, rear_l)), Vector((0.12, 0.3, -0.3)), Vector((-0.12, 0.3, -0.3)), Vector((-0.172, 0.336, rear_r))]
+    make("fuel", "fuel_feed", tube(feed, 0.0075, sides=12), "braided")
+    make("fuel", "fuel_crossover", tube(crossover, 0.0065, sides=12), "braided")
+    flow("fuel", "feed", "fuel", list(reversed(feed)))
+    flow("fuel", "crossover", "fuel", crossover)
     make("fuel", "pressure_regulator", cylinder(0.015, 0.04, segments=20, bevel=0.003), "blue", at(-0.215, 0.33, rear_r - 0.03) @ Y_UP)
 
 
@@ -550,11 +604,16 @@ def build_headers(cylinders):
             path = [port, port + p * 0.05 + Vector((0, -0.012, 0)), Vector((side * 0.395, 0.03, cz * 0.85 - 0.02)),
                     Vector((side * 0.41, -0.07, cz * 0.6 - 0.08)), Vector((side * (0.40 + dx), -0.145 + dy, -0.2)), Vector((side * (0.40 + dx * 0.5), -0.15 + dy * 0.5, -0.235))]
             make("headers", "primary", tube(path, 0.019, sides=12, resolution=8), "header", colors=header_heat(port))
+            flow("exhaust", str(c["number"]), "headers", path, cylinder=c["number"])
             make("headers", "port_flange", box(0.01, 0.062, 0.08, bevel=0.003), "header", bank(side) @ at(0.11, 0.28, cz), colors=header_heat(port))
         collector = frame((side * 0.40, -0.15, -0.23), (0, -0.05, -1))
         far = collector @ Vector((0, 0, 0.1))
         make("headers", "collector", lathe([(0.056, 0.0), (0.04, 0.1)], segments=32), "header", collector, colors=header_heat(far + Vector((0, 0, 0.5))))
-        make("headers", "tail_pipe", tube([far, Vector((side * 0.37, -0.2, -0.45)), Vector((side * 0.3, -0.22, -0.62))], 0.04, sides=16), "header", colors=header_heat(far + Vector((0, 0, 0.5))))
+        tail = [far, Vector((side * 0.37, -0.2, -0.45)), Vector((side * 0.3, -0.22, -0.62))]
+        # Its own node, so the page can take it off when the game turbo kit's downpipe takes its place.
+        make("headers", "tail_pipe", tube(tail, 0.04, sides=16), "header", colors=header_heat(far + Vector((0, 0, 0.5))),
+             pivot=(f"Tailpipe_{'left' if side > 0 else 'right'}", tuple(far)))
+        flow("exhaust", f"tail_{'left' if side > 0 else 'right'}", "headers", [Vector((side * 0.40, -0.15, -0.23))] + tail)
 
 
 OIL_TANK = (-0.42, 0.03, 0.40)  # illustrative: the dry-sump tank, ahead of the right strut tower and clear of the headlight
@@ -579,7 +638,9 @@ def build_dry_sump():
         make("dry-sump", "pump_fitting", cylinder(0.011, 0.026, segments=6, bevel=0.002), "red" if k else "blue", fitting)
         if k in (1, 2, 3):
             out = Vector((-0.262 - 0.045, -0.1 + 0.045, zf))
-            make("dry-sump", "scavenge_line", tube([out, out + Vector((0.0, 0.04, 0.0)), Vector((-0.2, -0.02, zf)), Vector((-0.185, -0.12, zf + 0.02))], 0.0065, sides=10), "braided")
+            scavenge = [out, out + Vector((0.0, 0.04, 0.0)), Vector((-0.2, -0.02, zf)), Vector((-0.185, -0.12, zf + 0.02))]
+            make("dry-sump", "scavenge_line", tube(scavenge, 0.0065, sides=10), "braided")
+            flow("oil", f"scavenge_{k}", "dry-sump", list(reversed(scavenge)))  # from the pan to the pump
     tx, ty, tz = OIL_TANK
     make("dry-sump", "oil_tank", lathe([(0.0, -0.15), (0.06, -0.15), (0.07, -0.14), (0.07, 0.14), (0.064, 0.152), (0.035, 0.158), (0.0, 0.158)], segments=40), "machined", at(tx, ty, tz) @ Y_UP)
     make("dry-sump", "tank_cap", cylinder(0.026, 0.022, segments=8, bevel=0.003), "red", at(tx, ty + 0.168, tz) @ Y_UP)
@@ -587,8 +648,12 @@ def build_dry_sump():
         make("dry-sump", "tank_strap", lathe([(0.0705, y - 0.01), (0.075, y - 0.008), (0.075, y + 0.008), (0.0705, y + 0.01)], segments=40), "black", at(tx, ty, tz) @ Y_UP)
     for y in (ty - 0.08, ty + 0.08):  # arms out to the inner fender
         make("dry-sump", "tank_bracket", box(0.17, 0.025, 0.05, bevel=0.005), "black", at(tx - 0.155, y, tz))
-    make("dry-sump", "pressure_line", tube([Vector((-0.29, -0.07, 0.25)), Vector((-0.36, -0.1, 0.36)), Vector((tx + 0.02, ty - 0.16, tz - 0.03))], 0.008, sides=12), "braided")
-    make("dry-sump", "breather_line", tube([Vector((tx + 0.03, ty + 0.15, tz - 0.02)), Vector((tx + 0.09, ty + 0.23, tz - 0.03)), Vector((-0.27, 0.3, 0.32))], 0.008, sides=12), "braided")
+    to_tank = [Vector((-0.29, -0.07, 0.25)), Vector((-0.36, -0.1, 0.36)), Vector((tx + 0.02, ty - 0.16, tz - 0.03))]
+    breather = [Vector((tx + 0.03, ty + 0.15, tz - 0.02)), Vector((tx + 0.09, ty + 0.23, tz - 0.03)), Vector((-0.27, 0.3, 0.32))]
+    make("dry-sump", "pressure_line", tube(to_tank, 0.008, sides=12), "braided")
+    make("dry-sump", "breather_line", tube(breather, 0.008, sides=12), "braided")
+    flow("oil", "to_tank", "dry-sump", to_tank)
+    flow("oil", "breather", "dry-sump", breather)
     make("dry-sump", "oil_filter", lathe([(0.0, -0.045)] + [(0.04 + (0.003 if k % 2 else 0), -0.045 + 0.009 * k) for k in range(11)] + [(0.0, 0.045)], segments=32), "blue", frame((-0.305, -0.03, -0.12), (-1, 0.2, 0)))
 
 
@@ -642,14 +707,20 @@ def build_bay(cfg):
     make("bay", "radiator_filler", cylinder(0.018, 0.03, segments=20), "machined", at(-(rad["halfWidth"] - 0.02), rad["top"] + 0.02, rad["z"]) @ Y_UP)
     upper_neck = origin + Vector((*THERMOSTAT, 0.385))
     lower_neck = origin + Vector((*PUMP_INLET, 0.345))
-    make("bay", "upper_hose", tube([Vector((-(rad["halfWidth"] - 0.02), rad["top"] - 0.04, rad["z"] - 0.035)), Vector((-0.28, rad["top"] - 0.015, rad["z"] - 0.16)),
-                                    Vector((upper_neck.x - 0.03, upper_neck.y + 0.012, upper_neck.z + 0.09)), upper_neck], 0.022, sides=16), "silicone")
-    make("bay", "lower_hose", tube([Vector((rad["halfWidth"] - 0.02, floor + 0.08, rad["z"] - 0.035)), Vector((0.3, floor + 0.09, rad["z"] - 0.16)),
-                                    Vector((lower_neck.x + 0.02, lower_neck.y - 0.03, lower_neck.z + 0.1)), lower_neck], 0.022, sides=16), "silicone")
+    upper = [Vector((-(rad["halfWidth"] - 0.02), rad["top"] - 0.04, rad["z"] - 0.035)), Vector((-0.28, rad["top"] - 0.015, rad["z"] - 0.16)),
+             Vector((upper_neck.x - 0.03, upper_neck.y + 0.012, upper_neck.z + 0.09)), upper_neck]
+    lower = [Vector((rad["halfWidth"] - 0.02, floor + 0.08, rad["z"] - 0.035)), Vector((0.3, floor + 0.09, rad["z"] - 0.16)),
+             Vector((lower_neck.x + 0.02, lower_neck.y - 0.03, lower_neck.z + 0.1)), lower_neck]
+    make("bay", "upper_hose", tube(upper, 0.022, sides=16), "silicone")
+    make("bay", "lower_hose", tube(lower, 0.022, sides=16), "silicone")
+    flow("coolant", "upper", "bay", list(reversed(upper)))  # hot, from the thermostat to the radiator
+    flow("coolant", "lower", "bay", lower)  # cooled, back to the water pump
     tank = Vector((0.46, 0.46, 1.70))
     make("bay", "expansion_tank", lathe([(0.0, -0.08), (0.045, -0.08), (0.05, -0.07), (0.05, 0.07), (0.045, 0.08), (0.0, 0.08)], segments=32), "machined", at(*tank) @ X_OUT)
     make("bay", "expansion_cap", cylinder(0.02, 0.02, segments=8, bevel=0.003), "red", at(tank.x, tank.y + 0.055, tank.z) @ Y_UP)
-    make("bay", "expansion_hose", tube([tank + Vector((-0.06, -0.03, 0.02)), Vector((0.39, 0.5, 1.85)), Vector((rad["halfWidth"] - 0.02, rad["top"] - 0.02, rad["z"] - 0.04))], 0.009, sides=10), "rubber")
+    expansion = [tank + Vector((-0.06, -0.03, 0.02)), Vector((0.39, 0.5, 1.85)), Vector((rad["halfWidth"] - 0.02, rad["top"] - 0.02, rad["z"] - 0.04))]
+    make("bay", "expansion_hose", tube(expansion, 0.009, sides=10), "rubber")
+    flow("coolant", "expansion", "bay", expansion)
     for side in (-1, 1):
         make("bay", "headlight_back", box(0.16, 0.13, 0.12, bevel=0.02), "black", at(side * 0.53, 0.43, 1.86))
 
@@ -749,6 +820,26 @@ def main():
 
     joined = [join(objects, f"Part_{part}" if part != "bay" else "Bay_shell", engine if part != "bay" else bay)
               for part, objects in PARTS.items()]
+    holders = dict(zip(PARTS.keys(), joined))
+    # Moving parts hang their mesh off a pivot: meshopt's quantization folds a scale and offset into whichever node
+    # holds a mesh, which would move the pivot.
+    for name, (part, point, objects, extras) in PIVOTS.items():
+        pivot = bpy.data.objects.new(name, None)
+        bpy.context.scene.collection.objects.link(pivot)
+        pivot.parent = holders[part]
+        pivot.location = TO_BLENDER @ Vector(point)
+        for key, value in extras.items():
+            pivot[key] = value
+        mesh = join(objects, f"{name}_mesh", pivot)
+        mesh.data.transform(Matrix.Translation(-(TO_BLENDER @ Vector(point))))
+        joined.append(mesh)
+    for name, part, point, extras in MARKERS:
+        empty = bpy.data.objects.new(name, None)
+        bpy.context.scene.collection.objects.link(empty)
+        empty.parent = holders[part]
+        empty.location = TO_BLENDER @ Vector(point)
+        for key, value in extras.items():
+            empty[key] = value
     bpy.context.view_layer.update()
     unwrap(joined)
     scale = metres_per_uv(joined)
@@ -757,8 +848,8 @@ def main():
     bake_ao(joined, ao_path)
 
     triangles = sum(len(p.vertices) - 2 for obj in joined for p in obj.data.polygons)
-    print(f"build_engine: {len(joined)} meshes, ~{triangles} triangles, {scale:.2f} m per UV unit")
-    bpy.ops.export_scene.gltf(filepath=out, export_format="GLB", export_apply=True, export_yup=True, export_texcoords=True,
+    print(f"build_engine: {len(joined)} meshes, {len(PIVOTS)} pivots, {len(MARKERS)} markers, ~{triangles} triangles, {scale:.2f} m per UV unit")
+    bpy.ops.export_scene.gltf(filepath=out, export_format="GLB", export_apply=True, export_yup=True, export_texcoords=True, export_extras=True,
                               export_normals=True, export_vertex_color="ACTIVE", export_cameras=False, export_lights=False)
 
 

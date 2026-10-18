@@ -12,6 +12,8 @@ kinematics frame:
 - Cam_<bank>_<in|ex>: origin on the cam's axis; turns about z at half crank speed.
 - Valve_<n>_<in|ex>: a cylinder's pair of intake or exhaust valves, shut. extras.axis is the stem direction; the
   page pushes them open against it.
+- Starter_pinion: origin on the starter's axis; turns against the flywheel's ring gear while the engine cranks.
+- Plugs: the eight spark plugs, which don't move.
 Each of those is a pivot with no mesh of its own; its mesh hangs off a child named <name>_mesh.
 
 layout.json carries the cylinders (src/engine/geometry.ts) and the timing (p60.wasm), so each cam lobe's nose meets
@@ -30,6 +32,9 @@ from mathutils import Matrix, Vector
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import build_engine as be  # noqa: E402  (its helpers; its main() runs only as a script)
 
+RING_TEETH, PINION_TEETH = 120, 11
+RING_PITCH = 0.1275  # with the pinion's, adds up to the 0.139 m between the crank's and the starter's axes
+FLYWHEEL_Z = (-0.312, -0.30)
 PIN_R = 0.024
 JOURNAL_R = 0.03
 WEB_T = 0.014
@@ -122,7 +127,40 @@ def build_crank(cfg, parent):
     parts.append(translated(be.cylinder(0.02, 0.185, segments=20), (0, 0, 0.3075)))  # the snout, to the damper
     parts.append(translated(be.cylinder(0.034, 0.012, segments=32, bevel=0.002), (0, 0, 0.25)))  # timing gear
     parts.append(translated(be.cylinder(0.062, 0.015, segments=40, bevel=0.003), (0, 0, -0.2425)))  # flywheel flange
+    # Behind the block: a stub to the flywheel, the flywheel with its ring gear, and a small multi-plate race clutch.
+    parts.append(translated(be.cylinder(0.03, 0.05, segments=24), (0, 0, -0.275)))
+    ring = [toward(k * 180 / RING_TEETH, RING_PITCH + (0.0022 if k % 2 == 0 else -0.0022)) for k in range(2 * RING_TEETH)]
+    parts.append(be.prism(ring, *FLYWHEEL_Z))
+    clutch = [(0.0, -0.312), (0.07, -0.312)] + [(0.07 - (0.004 if k % 2 else 0), -0.316 - 0.004 * k) for k in range(7)] + [(0.07, -0.345), (0.0, -0.345)]
+    parts.append(be.lathe(clutch, segments=40))
     return node("Crank", be.merge(*parts), "forged", parent=parent)
+
+
+def build_starter_pinion(parent):
+    """The starter's pinion, on its axis, meshing with the ring gear where the two pitch circles touch."""
+    sx, sy = be.STARTER
+    pitch = math.hypot(sx, sy) - RING_PITCH
+    contact = math.degrees(math.atan2(sx, sy))  # the crank's axis to the starter's, clockwise from +y
+    # Put a pinion tooth into the ring's gap nearest the contact, measured from the pinion's centre back toward the crank.
+    gap = (round(contact / (360 / RING_TEETH) - 0.5) + 0.5) * 360 / RING_TEETH
+    phase = contact + 180 - (contact - gap) * RING_TEETH / PINION_TEETH
+    outline = [toward(phase + k * 180 / PINION_TEETH, pitch + (0.0022 if k % 2 == 0 else -0.0022)) for k in range(2 * PINION_TEETH)]
+    gear = be.prism(outline, FLYWHEEL_Z[0], FLYWHEEL_Z[1])
+    shaft = translated(be.cylinder(0.006, 0.012, segments=10), (0, 0, FLYWHEEL_Z[0] - 0.006))
+    return node("Starter_pinion", be.merge(gear, shaft), "cam", origin=(sx, sy, 0), parent=parent)
+
+
+def build_plugs(cfg, parent):
+    """A central spark plug in each chamber, between its four valves, up through the head to its coil's boot."""
+    profile = [(0.0, 0.249), (0.0012, 0.249), (0.0012, 0.2515), (0.005, 0.2515), (0.006, 0.2525), (0.006, 0.272), (0.0085, 0.2725),
+               (0.0085, 0.285), (0.0055, 0.2865), (0.0055, 0.33), (0.0095, 0.332), (0.0095, 0.368), (0.0, 0.37)]
+    plugs = []
+    for c in cfg["cylinders"]:
+        plug = be.lathe(profile, segments=10)
+        bmesh.ops.recalc_face_normals(plug, faces=plug.faces)
+        be.place(plug, Matrix.Translation((0, 0, c["center"][2])) @ be.frame((0, 0, 0), c["axis"]))
+        plugs.append(plug)
+    return node("Plugs", be.merge(*plugs), "plug", parent=parent)
 
 
 def build_rods(cfg, parent):
@@ -214,6 +252,7 @@ def main():
         "piston": be.material("piston_aluminium", (0.78, 0.79, 0.80), 1.0, 0.36),
         "cam": be.material("ground_steel", (0.62, 0.63, 0.65), 1.0, 0.22),
         "valve": be.material("valve_steel", (0.55, 0.53, 0.50), 1.0, 0.3),
+        "plug": be.material("plug_ceramic", (0.85, 0.85, 0.82), 0.0, 0.35),
     })
     root = bpy.data.objects.new("Internals", None)
     bpy.context.scene.collection.objects.link(root)
@@ -221,6 +260,8 @@ def main():
     build_rods(cfg, root)
     build_pistons(cfg, root)
     build_valvetrain(cfg, root)
+    build_starter_pinion(root)
+    build_plugs(cfg, root)
     meshes = [obj for obj in bpy.data.objects if obj.type == "MESH"]
     triangles = sum(len(p.vertices) - 2 for obj in meshes for p in obj.data.polygons)
     print(f"build_internals: {len(meshes)} meshes, ~{triangles} triangles")
@@ -228,4 +269,5 @@ def main():
                               export_texcoords=False, export_cameras=False, export_lights=False)
 
 
-main()
+if __name__ == "__main__":  # tools/blender/build_turbo.py imports node() from here
+    main()

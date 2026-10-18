@@ -5,7 +5,7 @@ import { station } from '../music/station';
 import { audio } from './controller';
 import { bindAudio } from './bindings';
 
-vi.mock('./controller', () => ({ audio: { setEnabled: vi.fn(async () => undefined), sfx: vi.fn(), clearOwnTrack: vi.fn(), setRadioPlaying: vi.fn() } }));
+vi.mock('./controller', () => ({ audio: { setEnabled: vi.fn(async () => undefined), sfx: vi.fn(), clearOwnTrack: vi.fn(), setRadioPlaying: vi.fn(), setTurbo: vi.fn() } }));
 vi.mock('../music/station', () => ({ station: { pause: vi.fn() } }));
 
 let target: EventTarget;
@@ -92,7 +92,7 @@ describe('bindAudio with the engine', () => {
   beforeEach(() => {
     target = new EventTarget();
     Object.assign(globalThis, { window: target, localStorage: { getItem: () => 'off', setItem: () => undefined } });
-    useGarage.setState({ view: SHOWROOM, soundOn: true, engine: 'off' });
+    useGarage.setState({ view: SHOWROOM, soundOn: true, engine: 'off', turbo: false });
     vi.clearAllMocks();
     bindAudio();
   });
@@ -100,6 +100,13 @@ describe('bindAudio with the engine', () => {
   it('shows what the audio thread reports', () => {
     (audio as unknown as { onEngineStatus(status: string): void }).onEngineStatus('running');
     expect(useGarage.getState().engine).toBe('running');
+  });
+
+  it('fits and removes the game turbo kit in the engine sound', () => {
+    useGarage.getState().setTurbo(true);
+    expect(audio.setTurbo).toHaveBeenLastCalledWith(true);
+    useGarage.getState().setTurbo(false);
+    expect(audio.setTurbo).toHaveBeenLastCalledWith(false);
   });
 
   it('stops the engine when sound is turned off', () => {
