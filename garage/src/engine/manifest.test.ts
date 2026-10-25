@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ENGINE_TOPIC_IDS } from '../content/engine';
 import type { Vec3 } from '../math';
 import { ENGINE_ANCHORS } from './anchors';
-import { ENGINE_NODES, engineAssetErrors, partNode, SPIN_NODES, TURBO_NODES, turboAssetErrors, type Box, type EngineAssetFacts, INTERNALS_NODES, internalsAssetErrors } from './manifest';
+import { ENGINE_NODES, engineAssetErrors, partNode, SPIN_NODES, springNode, TURBO_NODES, turboAssetErrors, type Box, type EngineAssetFacts, INTERNALS_NODES, internalsAssetErrors } from './manifest';
 
 /** Each part's bounds: a 10 cm box around its anchor, which every anchor sits inside. */
 const around = (id: (typeof ENGINE_TOPIC_IDS)[number]): Box => {
@@ -81,6 +81,8 @@ describe('internalsAssetErrors', () => {
     triangles: 20_000,
     valveAxes: Object.fromEntries(INTERNALS_NODES.filter((name) => name.startsWith('Valve_')).map((name) => [name, axis])),
     pivotsWithMeshes: [],
+    springLengths: Object.fromEntries(INTERNALS_NODES.filter((name) => name.startsWith('Springs_')).map((name) => [name, 0.036])),
+    flows: { Flow_chain_left: [0, 0, 0, 0.1, 0, 0], Flow_chain_right: [0, 0, 0, 0.1, 0, 0] } as Record<string, unknown>,
   };
 
   it('accepts a complete set of moving parts', () => {
@@ -96,6 +98,19 @@ describe('internalsAssetErrors', () => {
     expect(INTERNALS_NODES).toEqual(expect.arrayContaining(['Starter_pinion', 'Plugs']));
   });
 
+  it('names the valve springs, the oil pump’s rotors and the timing chains', () => {
+    expect(INTERNALS_NODES.filter((name) => /^Springs_\d_(in|ex)$/.test(name))).toHaveLength(16);
+    expect(springNode(3, true)).toBe('Springs_3_ex');
+    expect(INTERNALS_NODES).toEqual(expect.arrayContaining(['Oil_pump', 'Oil_pump_outer', 'Flow_chain_left', 'Flow_chain_right']));
+  });
+
+  it('wants each pair of springs’ length, to compress them by the lift, and each chain’s path', () => {
+    expect(internalsAssetErrors({ ...good, springLengths: { ...good.springLengths, Springs_2_in: undefined }, flows: { ...good.flows, Flow_chain_left: [0, 0] } })).toEqual([
+      'Springs_2_in has no length in its extras',
+      'Flow_chain_left needs two or more points (x, y, z, ...)',
+    ]);
+  });
+
   it('wants each moving part as a pivot holding its mesh, so compression can’t move the pivot', () => {
     expect(internalsAssetErrors({ ...good, pivotsWithMeshes: ['Crank', 'Rod_1'] })).toEqual([
       'Crank holds its mesh directly; quantization would move its pivot',
@@ -108,13 +123,13 @@ describe('internalsAssetErrors', () => {
       ...good,
       nodeNames: good.nodeNames.filter((name) => name !== 'Rod_3'),
       bytes: 2_000_000,
-      triangles: 50_000,
+      triangles: 70_000,
       valveAxes: { ...good.valveAxes, Valve_1_in: undefined, Valve_2_ex: [0, 2, 0] },
     });
     expect(errors).toEqual([
       'missing node: Rod_3',
       'file is 1.9 MB; budget is 1 MB',
-      '50000 triangles; budget is 40000',
+      '70000 triangles; budget is 60000',
       'Valve_1_in has no unit stem axis in its extras',
       'Valve_2_ex has no unit stem axis in its extras',
     ]);

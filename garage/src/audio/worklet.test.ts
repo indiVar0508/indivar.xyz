@@ -81,9 +81,11 @@ describe('p60-worklet.js', () => {
     expect(last().wheel).toBeGreaterThan(20);
     expect(last().clutch).toBeGreaterThan(0);
     processor.port.onmessage!({ data: { type: 'stop' } });
-    render(processor, 2);
-    expect(last().status).toBe(0);
-    expect(last().wheel).toBeGreaterThan(0); // the reports carry on while the rollers coast
+    render(processor, 4);
+    const reports = processor.port.posted as Report[];
+    // The reports carry on while the rollers brake to a stop after the engine, and end with them still.
+    expect(reports.some((report) => report.status === 0 && report.wheel > 0)).toBe(true);
+    expect(last()).toMatchObject({ status: 0, wheel: 0 });
   });
 
   it('renders a render quantum larger than the crate block in pieces', () => {

@@ -86,6 +86,9 @@ export function engineAssetErrors(facts: EngineAssetFacts): string[] {
 const CYLINDERS = [1, 2, 3, 4, 5, 6, 7, 8] as const;
 export const CAM_NODES = ['Cam_right_in', 'Cam_right_ex', 'Cam_left_in', 'Cam_left_ex'] as const;
 export const valveNode = (cylinder: number, exhaust: boolean): string => `Valve_${cylinder}_${exhaust ? 'ex' : 'in'}`;
+/** A valve pair's springs: a pivot on the spring seat, along the stem, that the page compresses by the lift. */
+export const springNode = (cylinder: number, exhaust: boolean): string => `Springs_${cylinder}_${exhaust ? 'ex' : 'in'}`;
+export const CHAIN_FLOWS = ['Flow_chain_right', 'Flow_chain_left'] as const;
 export const INTERNALS_NODES: string[] = [
   'Internals',
   'Crank',
@@ -95,8 +98,12 @@ export const INTERNALS_NODES: string[] = [
   ...CYLINDERS.flatMap((n) => [valveNode(n, false), valveNode(n, true)]),
   'Starter_pinion',
   'Plugs',
+  ...CYLINDERS.flatMap((n) => [springNode(n, false), springNode(n, true)]),
+  'Oil_pump',
+  'Oil_pump_outer',
+  ...CHAIN_FLOWS,
 ];
-export const INTERNALS_BUDGET = { maxBytes: 1024 * 1024, maxTriangles: 40_000 } as const;
+export const INTERNALS_BUDGET = { maxBytes: 1024 * 1024, maxTriangles: 60_000 } as const;
 
 export type InternalsAssetFacts = {
   nodeNames: string[];
@@ -106,7 +113,13 @@ export type InternalsAssetFacts = {
   valveAxes: Record<string, unknown>;
   /** Moving-part nodes that carry a mesh themselves instead of holding it as a child. */
   pivotsWithMeshes: string[];
+  /** Each Springs_* node's extras.length: how long the springs stand with the valves shut (m). */
+  springLengths: Record<string, unknown>;
+  /** Each timing chain's path, from its extras.points. */
+  flows: Record<string, unknown>;
 };
+
+const isPath = (points: unknown): boolean => Array.isArray(points) && points.length >= 6 && points.length % 3 === 0;
 
 const isUnit = (axis: unknown): boolean =>
   Array.isArray(axis) && axis.length === 3 && axis.every((v) => typeof v === 'number') && Math.abs(Math.hypot(...(axis as number[])) - 1) < 1e-3;
@@ -119,6 +132,11 @@ export function internalsAssetErrors(facts: InternalsAssetFacts): string[] {
   for (const name of INTERNALS_NODES.filter((n) => n.startsWith('Valve_') && have.has(n))) {
     if (!isUnit(facts.valveAxes[name])) errors.push(`${name} has no unit stem axis in its extras`);
   }
+  for (const name of INTERNALS_NODES.filter((n) => n.startsWith('Springs_') && have.has(n))) {
+    const length = facts.springLengths[name];
+    if (typeof length !== 'number' || length <= 0) errors.push(`${name} has no length in its extras`);
+  }
+  for (const name of CHAIN_FLOWS) if (have.has(name) && !isPath(facts.flows[name])) errors.push(`${name} needs two or more points (x, y, z, ...)`);
   // Mesh quantization folds a scale and offset into the node that holds a mesh, which would move a pivot.
   for (const name of facts.pivotsWithMeshes) errors.push(`${name} holds its mesh directly; quantization would move its pivot`);
   return errors;

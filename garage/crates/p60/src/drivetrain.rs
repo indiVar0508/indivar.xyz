@@ -31,6 +31,8 @@ const ROLLING: f32 = 165.0;
 const DRAG: f32 = 0.48;
 /// How much of the clutch's torque reaches the wheels through the gears.
 pub const EFFICIENCY: f32 = 0.9;
+/// How hard the rolling road brakes its rollers once the engine stops (m/s² at the tyres).
+const ROLLER_BRAKE: f32 = 6.0;
 /// What the clutch can pass fully engaged (N·m), and the engine speeds over which it bites.
 const CLUTCH_CAPACITY: f32 = 1.5 * PEAK_TORQUE;
 const BITE_RPM: f32 = 1200.0;
@@ -128,12 +130,13 @@ impl Drivetrain {
         (ROLLING + DRAG * v * v) * TYRE_RADIUS
     }
 
-    /// The wheels roll on against the road load alone.
-    pub fn coast(&mut self, dt: f32) {
+    /// The wheels roll on against the road load, and against the rollers' brake when `braking` (the engine is off).
+    pub fn coast(&mut self, dt: f32, braking: bool) {
         self.shift = (self.shift - dt).max(0.0);
         self.clutch = 0.0;
         self.locked = false;
-        self.wheel = (self.wheel - self.road_load() / WHEEL_INERTIA * dt).max(0.0);
+        let brake = if braking && self.wheel > 0.0 { ROLLER_BRAKE / TYRE_RADIUS } else { 0.0 };
+        self.wheel = (self.wheel - (self.road_load() / WHEEL_INERTIA + brake) * dt).max(0.0);
     }
 
     /// Steps the engine and the wheels together. `net` is the engine's torque less its losses, as rpm/s of free
@@ -141,7 +144,7 @@ impl Drivetrain {
     pub fn step(&mut self, rpm: f32, net: f32, running: bool, dt: f32) -> f32 {
         let capacity = if running { CLUTCH_CAPACITY * self.engagement(rpm) } else { 0.0 };
         if capacity <= 0.0 {
-            self.coast(dt);
+            self.coast(dt, !running);
             return (rpm + net * dt).max(0.0);
         }
         self.shift = (self.shift - dt).max(0.0);

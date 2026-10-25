@@ -1,6 +1,8 @@
 //! Renders a test drive to a 16-bit stereo WAV for listening and measurement:
 //! start and idle, three blips, a run to the limiter, the overrun back to idle, then switch-off.
-//! Usage: cargo run --release --example render -- out.wav [--levels] [--turbo]
+//! With --gears it drives on the rolling road instead: into 1st, full throttle through the gears (changing up at
+//! 8,000 rpm), then a lift in top to hear the gears whine on the overrun.
+//! Usage: cargo run --release --example render -- out.wav [--levels] [--turbo] [--gears]
 use p60::synth::{Synth, MAX_FRAMES};
 use std::io::Write;
 
@@ -12,8 +14,13 @@ fn main() {
     synth.engine.turbo = std::env::args().any(|a| a == "--turbo");
     let mut samples: Vec<i16> = Vec::new();
     let mut left: Vec<f32> = Vec::new();
-    let script: &[(f32, f32)] = &[(0.0, 0.0), (4.0, 1.0), (4.25, 0.0), (5.5, 1.0), (5.75, 0.0), (7.0, 1.0), (7.3, 0.0), (8.5, 1.0), (11.0, 0.0), (15.0, -1.0)];
-    let total = 18.0;
+    let gears = std::env::args().any(|a| a == "--gears");
+    let script: &[(f32, f32)] = if gears {
+        &[(0.0, 0.0), (3.5, 1.0), (19.0, 0.0), (24.0, -1.0)]
+    } else {
+        &[(0.0, 0.0), (4.0, 1.0), (4.25, 0.0), (5.5, 1.0), (5.75, 0.0), (7.0, 1.0), (7.3, 0.0), (8.5, 1.0), (11.0, 0.0), (15.0, -1.0)]
+    };
+    let total = if gears { 27.0 } else { 18.0 };
     let block = 128;
     let mut t = 0.0f32;
     let mut stats = (0.0f32, 0.0f32, 0usize);
@@ -23,6 +30,9 @@ fn main() {
             if at > t - block as f32 / RATE as f32 && at <= t {
                 if pedal < 0.0 { synth.engine.stop() } else { synth.engine.set_pedal(pedal) }
             }
+        }
+        if gears && ((t > 3.0 && synth.engine.drive.gear == 0) || (synth.engine.rpm > 8000.0 && synth.engine.drive.gear < 6)) && synth.engine.drive.shift_up() {
+            println!("{t:5.2}s into gear {} at {:.0} km/h", synth.engine.drive.gear, synth.engine.drive.speed_kmh());
         }
         synth.render(block);
         for n in 0..block {
@@ -36,11 +46,15 @@ fn main() {
         }
         t += block as f32 / RATE as f32;
         if stats.2 >= (RATE / 4) as usize && std::env::args().any(|a| a == "--levels") {
-            println!("{t:5.2}s {:6.0} rpm  status {:?}  rms {:.3}  peak {:.3}", synth.engine.rpm, synth.engine.status, (stats.0 / stats.2 as f32).sqrt(), stats.1);
+            println!("{t:5.2}s {:6.0} rpm  gear {} {:3.0} km/h  status {:?}  rms {:.3}  peak {:.3}", synth.engine.rpm, synth.engine.drive.gear, synth.engine.drive.speed_kmh(), synth.engine.status, (stats.0 / stats.2 as f32).sqrt(), stats.1);
             stats = (0.0, 0.0, 0);
         }
     }
-    analyze(&left, RATE as f32, &[(0.1, "cranking"), (3.5, "idle"), (9.4, "limiter"), (11.05, "overrun"), (5.78, "blip")]);
+    if gears {
+        analyze(&left, RATE as f32, &[(3.2, "1st idle"), (6.0, "pulling"), (16.0, "high gear"), (19.5, "lift"), (24.5, "rolling")]);
+    } else {
+        analyze(&left, RATE as f32, &[(0.1, "cranking"), (3.5, "idle"), (9.4, "limiter"), (11.05, "overrun"), (5.78, "blip")]);
+    }
     let data_len = (samples.len() * 2) as u32;
     let mut f = std::fs::File::create(&path).unwrap();
     f.write_all(b"RIFF").unwrap();

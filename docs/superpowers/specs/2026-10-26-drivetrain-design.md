@@ -77,3 +77,28 @@ gearbox goes behind the engine, as in the road M3.
   - tests come first;
   - GARAGE_URL=http://localhost:4177/ when port 4176 is busy.
 - Commit on `garage-drivetrain`, which branches from `garage-engine-details`. Don't push without asking.
+
+## 5. As built
+
+- **Driven wheels only.** Only the rear wheels are pivots (`Wheel_RL`, `Wheel_RR`), since the fronts never turn on a
+  two-wheel-drive rolling road. Each holds its tyre, rim and brake disc; the calipers stay on the body.
+- **Clutch and creep.** The automatic clutch bites from 1,200 rpm, so in gear at idle the car creeps, to about 17 km/h
+  in 1st, as a car does with the clutch out at idle. Shift presses come no faster than a change takes (0.12 s).
+- **Roller brake.** In neutral the rollers coast against road load, but once the engine stops the rolling road brakes
+  them at 6 m/s², so the wheels don't spin on for a minute after a stop at speed.
+- **Measured drive** (48 kHz render, `--gears`): 0–100 km/h in 4.3 s and 0–200 in 13 s, changing up at 8,000 rpm at
+  106, 142, 175 and 201 km/h. Drag holds 6th to about 265 km/h, short of the 282 km/h its ratio allows at the limiter.
+- **Measured sound.** A long lift in gear stays at about 0.04 RMS (idle is 0.06): with the fuel cut, the pumping pulses
+  grow with rpm so the overrun isn't silent. Peaks stay under 0.65.
+- **Camera.** The view is from behind the left side and above, so on a desktop screen the whole driveline sits left of
+  the panel and above the dock (a test checks it).
+- **Timing drive.** A 28-tooth double sprocket on the crank and 56-tooth cam sprockets turn the cams at half speed. The
+  left bank's chain runs 14 mm in front of the right's, so they pass at the crank, and the crank's nose narrows to a
+  15 mm radius to fit the sprocket.
+- **Oil pump.** Five gerotor stages at half crank speed (illustrative), with the outer rings following at 6/7.
+- **Sizes and budget.**
+  - Car: 2.8 MB and 116,360 triangles, unchanged by the split.
+  - Drivetrain: 0.2 MB and 20,040 triangles.
+  - Moving parts: 0.3 MB and 54,100 triangles, with the budget raised from 40k to 60k.
+  - JavaScript: 449 of 450 KB gzip. The budget is effectively full; the next feature needs code trimmed or the
+    budget raised.

@@ -85,6 +85,8 @@ const internals = await check('p60b40-internals.glb', (document, bytes) => {
     triangles: triangleCount(document),
     valveAxes: Object.fromEntries(nodes.filter((node) => node.getName().startsWith('Valve_')).map((node) => [node.getName(), node.getExtras().axis])),
     pivotsWithMeshes: nodes.filter((node) => INTERNALS_NODES.includes(node.getName()) && node.getMesh()).map((node) => node.getName()),
+    springLengths: Object.fromEntries(nodes.filter((node) => node.getName().startsWith('Springs_')).map((node) => [node.getName(), node.getExtras().length])),
+    flows: Object.fromEntries(nodes.filter((node) => node.getName().startsWith('Flow_')).map((node) => [node.getName(), node.getExtras().points])),
   });
 });
 

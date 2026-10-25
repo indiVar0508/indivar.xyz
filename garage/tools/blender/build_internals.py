@@ -14,11 +14,17 @@ kinematics frame:
   page pushes them open against it.
 - Starter_pinion: origin on the starter's axis; turns against the flywheel's ring gear while the engine cranks.
 - Plugs: the eight spark plugs, which don't move.
-Each of those is a pivot with no mesh of its own; its mesh hangs off a child named <name>_mesh.
+- Springs_<n>_<in|ex>: a valve pair's springs, on the spring seats, turned so local +y runs up the stems.
+  extras.length is how long they stand with the valves shut; the page scales y to compress them by the lift.
+- Oil_pump, Oil_pump_outer: the dry-sump pump's gerotor stages, inner rotors on the pump's shaft and outer rings on
+  an axis offset from it. extras.ratio is the pump's turns per crank turn, extras.lobes the inner and outer lobes.
+- Flow_chain_<bank>: each bank's timing chain, a closed path round the crank's sprocket and its two cam sprockets in
+  the chain's running direction, with extras.radius, the crank sprocket's pitch radius.
+Each of those pivots has no mesh of its own; its mesh hangs off a child named <name>_mesh.
 
 layout.json carries the cylinders (src/engine/geometry.ts) and the timing (p60.wasm), so each cam lobe's nose meets
 its tappet at the crank angle where the crate puts peak lift. Sizes the crate doesn't own (journals, webs, valve
-heads) are illustrative.
+heads, springs, chains, pump) are illustrative: no source shows the P60B40's cam drive, valve springs or oil pump.
 """
 import json
 import math
@@ -44,6 +50,15 @@ SEAT = 0.252  # valve faces, measured up the bore from the crank axis
 VALVE_LENGTH = 0.088
 BUCKET = 0.012
 PAIR = 0.018  # each valve of a pair sits this far in front of or behind the bore's centre
+SPRING_LENGTH = 0.034  # each valve spring, shut, from its seat to the bucket's underside
+SPRING_R = 0.0095
+CAM_TEETH, CRANK_TEETH = 56, 28  # the cams turn at half crank speed
+CAM_SPROCKET_PITCH = 0.038
+CRANK_SPROCKET_PITCH = CAM_SPROCKET_PITCH * CRANK_TEETH / CAM_TEETH
+CHAIN_Z = {"right": 0.266, "left": 0.280}  # each bank's chain runs on its own plane, so they pass at the crank
+PUMP = (-0.262, -0.1)  # the dry-sump pump stack's axis (build_engine.py)
+PUMP_OFFSET = 0.0035  # between a gerotor's inner rotor and outer ring
+PUMP_RATIO = 0.5  # illustrative: the pump's turns per crank turn
 VALVES = {
     "in": {"x": -0.017, "tilt": 14.0, "head": 0.0175, "bucket": 0.0135},  # toward the V
     "ex": {"x": 0.017, "tilt": -12.0, "head": 0.015, "bucket": 0.0125},
@@ -89,6 +104,10 @@ def node(name, bm, mat, origin=(0, 0, 0), parent=None, axis=None, sharp=40):
     return pivot
 
 
+def sprocket(teeth, pitch, z0, z1):
+    return be.prism([toward(a * 180 / teeth, pitch + (0.002 if a % 2 else -0.002)) for a in range(2 * teeth)], z0, z1)
+
+
 def lift_at(k, crank_from_peak):
     """The crate's lift curve: cos² over the valve's open duration."""
     d = (crank_from_peak + 360.0) % 720.0 - 360.0
@@ -124,8 +143,9 @@ def build_crank(cfg, parent):
     stops.append(-0.235)
     for a, b in zip(stops[0::2], stops[1::2]):  # five main journals, between and outside the throws
         parts.append(translated(be.cylinder(JOURNAL_R, a - b, segments=28), (0, 0, (a + b) / 2)))
-    parts.append(translated(be.cylinder(0.02, 0.185, segments=20), (0, 0, 0.3075)))  # the snout, to the damper
-    parts.append(translated(be.cylinder(0.034, 0.012, segments=32, bevel=0.002), (0, 0, 0.25)))  # timing gear
+    parts.append(translated(be.cylinder(0.015, 0.185, segments=20), (0, 0, 0.3075)))  # the snout, to the damper
+    for z in CHAIN_Z.values():  # a sprocket for each bank's chain
+        parts.append(sprocket(CRANK_TEETH, CRANK_SPROCKET_PITCH, z - 0.004, z + 0.004))
     parts.append(translated(be.cylinder(0.062, 0.015, segments=40, bevel=0.003), (0, 0, -0.2425)))  # flywheel flange
     # Behind the block: a stub to the flywheel, the flywheel with its ring gear, and a small multi-plate race clutch.
     parts.append(translated(be.cylinder(0.03, 0.05, segments=24), (0, 0, -0.275)))
@@ -199,8 +219,10 @@ def stem(kind):
 
 
 def build_valvetrain(cfg, parent):
+    """The cams, the valves and their springs. Returns each cam's centre (x, y) by bank and kind, for the chains."""
     k = cfg["kinematics"]
     base = k["camBaseRadius"]
+    centres = {}
     for side, name in ((-1, "right"), (1, "left")):
         frame = be.bank(side)
         turn = frame.to_3x3()
@@ -213,9 +235,10 @@ def build_valvetrain(cfg, parent):
             face = Vector((v["x"], SEAT, 0))
             centre = frame @ (face + stem(kind) * (VALVE_LENGTH + BUCKET + base))
 
-            parts = [be.cylinder(0.011, 0.47, segments=14), translated(be.cylinder(0.009, 0.03, segments=12), (0, 0, 0.25))]
-            teeth = [toward(a * 360 / 56, 0.040 if a % 2 else 0.036) for a in range(56)]
-            parts.append(be.prism(teeth, 0.262, 0.270))  # the sprocket
+            centres[(name, kind)] = (centre.x, centre.y)
+            chain = CHAIN_Z[name] - zc  # the sprocket sits on its bank's chain plane
+            parts = [be.cylinder(0.011, 0.47, segments=14), translated(be.cylinder(0.009, chain - 0.23, segments=12), (0, 0, (chain + 0.23) / 2))]
+            parts.append(sprocket(CAM_TEETH, CAM_SPROCKET_PITCH, chain - 0.004, chain + 0.004))
             for c in own:
                 cz = c["center"][2] - zc
                 parts.append(translated(be.cylinder(0.0145, 0.012, segments=18), (0, 0, cz)))  # bearing journal
@@ -239,6 +262,72 @@ def build_valvetrain(cfg, parent):
                         be.place(piece, Matrix.Translation((0, 0, dz)) @ be.frame((0, 0, 0), axis))
                         pieces.append(piece)
                 node(f"Valve_{c['number']}_{kind}", be.merge(*pieces), "valve", origin=tuple(rest), parent=parent, axis=tuple(axis))
+                build_springs(f"Springs_{c['number']}_{kind}", rest + axis * (VALVE_LENGTH - SPRING_LENGTH), axis, parent)
+    return centres
+
+
+def build_springs(name, seat, axis, parent):
+    """A valve pair's two coil springs, standing on their seats along the stems. The pivot is turned about z so its
+    local +y runs up the stems, which lets the page compress the coils by scaling y."""
+    turns, per_turn = 5.5, 7
+    coils = []
+    for dz in (-PAIR, PAIR):
+        points = []
+        for i in range(int(turns * per_turn) + 1):
+            t = 2 * math.pi * i / per_turn
+            points.append(Vector((SPRING_R * math.cos(t), SPRING_LENGTH * i / (turns * per_turn), dz + SPRING_R * math.sin(t))))
+        coils.append(be.tube(points, 0.0016, sides=5, resolution=1))
+    pivot = node(name, be.merge(*coils), "spring", origin=tuple(seat), parent=parent)
+    pivot.rotation_euler = (0.0, -math.atan2(-axis.x, axis.y), 0.0)  # glTF z is Blender's -y
+    pivot["length"] = SPRING_LENGTH
+
+
+def lobed(r, depth, lobes, centre_x=0.0, points=72):
+    return [((r + depth * math.cos(lobes * a)) * math.cos(a) + centre_x, (r + depth * math.cos(lobes * a)) * math.sin(a))
+            for a in (2 * math.pi * i / points for i in range(points))]
+
+
+def ring_prism(outer, inner, z0, z1):
+    """A ring between two closed outlines with as many points, extruded from z0 to z1."""
+    bm = bmesh.new()
+    loops = [[bm.verts.new((x, y, z)) for x, y in outline] for outline, z in ((outer, z0), (outer, z1), (inner, z1), (inner, z0))]
+    n = len(outer)
+    for a, b in zip(loops, loops[1:] + loops[:1]):
+        for i in range(n):
+            bm.faces.new((a[i], a[(i + 1) % n], b[(i + 1) % n], b[i]))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    return bm
+
+
+def build_oil_pump(parent):
+    """The dry-sump pump's five gerotor stages (one pressure, four scavenge), inside the pump stack: a six-lobed inner
+    rotor on the shaft turning inside a seven-lobed outer ring on an offset axis, which follows at six-sevenths speed."""
+    stages = [-0.16 + 0.1 * k for k in range(5)]
+    inner = [translated(be.cylinder(0.007, 0.5, segments=12), (0, 0, 0.04))]
+    outer = []
+    for z in stages:
+        inner.append(be.prism(lobed(0.019, 0.0035, 6), z - 0.03, z + 0.03))
+        outer.append(ring_prism(lobed(0.037, 0.0, 7), lobed(0.0265, 0.0035, 7), z - 0.03, z + 0.03))
+    pump = node("Oil_pump", be.merge(*inner), "cam", origin=(PUMP[0], PUMP[1], 0), parent=parent)
+    pump["ratio"] = PUMP_RATIO
+    pump["lobes"] = [6, 7]
+    node("Oil_pump_outer", be.merge(*outer), "forged", origin=(PUMP[0] + PUMP_OFFSET, PUMP[1], 0), parent=parent)
+
+
+def build_chains(centres, parent):
+    """Each bank's timing chain: the outline round the crank's sprocket and its two cam sprockets, running the way the
+    crank turns (clockwise from the front), closed by repeating its first point."""
+    for bank, z in CHAIN_Z.items():
+        circles = [(0.0, 0.0, CRANK_SPROCKET_PITCH)] + [(*centres[(bank, kind)], CAM_SPROCKET_PITCH) for kind in ("in", "ex")]
+        samples = [(round(x + r * math.cos(a), 6), round(y + r * math.sin(a), 6)) for x, y, r in circles for a in (2 * math.pi * i / 32 for i in range(32))]
+        hull = list(reversed(be.convex_hull(samples)))  # the hull runs anticlockwise; the chain runs clockwise
+        path = [(x, y, z) for x, y in hull + hull[:1]]
+        chain = bpy.data.objects.new(f"Flow_chain_{bank}", None)
+        bpy.context.scene.collection.objects.link(chain)
+        chain.parent = parent
+        chain["kind"] = "chain"
+        chain["points"] = [round(v, 5) for p in path for v in p]
+        chain["radius"] = CRANK_SPROCKET_PITCH
 
 
 def main():
@@ -253,15 +342,18 @@ def main():
         "cam": be.material("ground_steel", (0.62, 0.63, 0.65), 1.0, 0.22),
         "valve": be.material("valve_steel", (0.55, 0.53, 0.50), 1.0, 0.3),
         "plug": be.material("plug_ceramic", (0.85, 0.85, 0.82), 0.0, 0.35),
+        "spring": be.material("spring_steel", (0.32, 0.33, 0.36), 1.0, 0.35),
     })
     root = bpy.data.objects.new("Internals", None)
     bpy.context.scene.collection.objects.link(root)
     build_crank(cfg, root)
     build_rods(cfg, root)
     build_pistons(cfg, root)
-    build_valvetrain(cfg, root)
+    centres = build_valvetrain(cfg, root)
     build_starter_pinion(root)
     build_plugs(cfg, root)
+    build_oil_pump(root)
+    build_chains(centres, root)
     meshes = [obj for obj in bpy.data.objects if obj.type == "MESH"]
     triangles = sum(len(p.vertices) - 2 for obj in meshes for p in obj.data.polygons)
     print(f"build_internals: {len(meshes)} meshes, ~{triangles} triangles")

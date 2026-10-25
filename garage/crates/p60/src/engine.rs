@@ -151,14 +151,14 @@ impl Engine {
                 self.rpm = 0.0;
                 self.effective = 0.0;
                 speed = 0.0;
-                self.drive.coast(dt);
+                self.drive.coast(dt, true);
             }
             Status::Cranking => {
                 self.effective = 0.0;
                 self.rpm += (CRANKING_RPM - self.rpm) * (dt / 0.12).min(1.0);
                 // Each compression stroke slows the starter: four per turn.
                 speed = self.rpm * (1.0 + 0.35 * (4.0 * self.angle.to_radians()).sin());
-                self.drive.coast(dt);
+                self.drive.coast(dt, true);
                 if self.elapsed >= self.catch_at {
                     self.status = Status::Running;
                     self.elapsed = 0.0;
@@ -421,13 +421,19 @@ mod tests {
     }
 
     #[test]
-    fn stopping_in_gear_lets_the_wheels_roll_on() {
+    fn coasting_in_neutral_rolls_on_but_the_rollers_brake_to_a_stop_once_the_engine_stops() {
+        let mut coasting = rolling(4, 5000.0);
+        coasting.drive.gear = 0;
+        let start = coasting.drive.wheel;
+        run(&mut coasting, 3.0);
+        assert!(coasting.drive.wheel > 0.8 * start, "coasts on: {} of {start}", coasting.drive.wheel);
         let mut engine = rolling(4, 5000.0);
-        let start = engine.drive.wheel;
         engine.stop();
         run(&mut engine, 3.0);
         assert_eq!(engine.status, Status::Off);
-        assert!(engine.drive.wheel > 0.8 * start && engine.drive.wheel < start);
+        assert!(engine.drive.wheel < 0.6 * start, "braking: {} of {start}", engine.drive.wheel);
+        run(&mut engine, 8.0);
+        assert_eq!(engine.drive.wheel, 0.0);
         engine.reset();
         assert_eq!((engine.drive.gear, engine.drive.wheel), (0, 0.0));
     }

@@ -273,7 +273,10 @@ impl Synth {
                     self.fire(i);
                 }
                 if crossed(from, to, ex_open) {
-                    self.blowdown[i] = Pulse { phase: 0.0, amp: 0.05 + self.combustion[i] };
+                    // Even without a burn, the cylinder pumps out the air it drew in, harder the faster it turns: on a
+                    // long overrun in gear, with the fuel cut, that is most of what's heard.
+                    let pumped = 0.05 + 0.12 * (self.engine.rpm / LIMIT_RPM).min(1.0);
+                    self.blowdown[i] = Pulse { phase: 0.0, amp: pumped + self.combustion[i] };
                     self.maybe_pop(i);
                 }
                 if crossed(from, to, in_open) {
@@ -395,11 +398,11 @@ impl Synth {
         }
         let load = (drive.clutch.abs() / PEAK_TORQUE).min(1.5);
         self.whine[0] = (self.whine[0] + input * CONSTANT_MESH.0 as f32 * self.dt).fract();
-        let mut whine = (TAU * self.whine[0]).sin() * (0.0012 + 0.016 * load);
+        let mut whine = (TAU * self.whine[0]).sin() * (0.0015 + 0.026 * load);
         if drive.gear > 0 {
             let layshaft = input * CONSTANT_MESH.0 as f32 / CONSTANT_MESH.1 as f32;
             self.whine[1] = (self.whine[1] + layshaft * GEAR_TEETH[drive.gear - 1].0 as f32 * self.dt).fract();
-            whine += (TAU * self.whine[1]).sin() * 0.012 * load;
+            whine += (TAU * self.whine[1]).sin() * 0.018 * load;
         }
         let hum = self.roller_tone.tick(self.rng.noise()) * 0.06 * (road / 70.0).min(1.2);
         whine + hum
@@ -582,6 +585,27 @@ mod tests {
         synth.engine.drive.wheel *= 0.3;
         let slower = sound(&mut synth);
         assert!(rms(&rolling) > 2.0 * rms(&slower), "roller hum {} vs {}", rms(&rolling), rms(&slower));
+    }
+
+    #[test]
+    fn a_long_overrun_in_gear_still_pumps_audibly() {
+        let mut synth = Synth::new(RATE, 19);
+        let mut out = Vec::new();
+        synth.start();
+        render_seconds(&mut synth, 4.0, &mut out);
+        let idle = rms(&out[out.len() - 24_000..]);
+        // Rolling in 4th at 6,000 rpm with the foot off: the car keeps the engine turning, with its fuel cut.
+        let drive = &mut synth.engine.drive;
+        drive.gear = 4;
+        drive.wheel = 6000.0 * core::f32::consts::PI / 30.0 / crate::drivetrain::overall_ratio(4);
+        drive.locked = true;
+        synth.engine.rpm = 6000.0;
+        out.clear();
+        render_seconds(&mut synth, 3.0, &mut out);
+        assert!(synth.engine.rpm > 4000.0, "the car keeps it turning: {} rpm", synth.engine.rpm);
+        let overrun = rms(&out[out.len() - 24_000..]);
+        assert!(overrun > 0.5 * idle, "overrun {overrun} vs idle {idle}");
+        assert!(out.iter().all(|v| v.is_finite() && v.abs() < 1.0));
     }
 
     #[test]

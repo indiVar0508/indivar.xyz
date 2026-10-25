@@ -91,10 +91,17 @@ The P60B40 and its engine bay are modelled by a script, not downloaded: `npm run
 "Start engine" runs the P60B40: its sound is synthesized live by the engine's own Rust crate, `garage/crates/p60`, compiled to WebAssembly and played in an AudioWorklet (`garage/public/wasm/p60-worklet.js`). "Look inside" shows the engine as an x-ray around its moving parts, which the same crate animates from the real firing order (1-8-3-6-4-5-2-7). Timing the crate doesn't know from a source (rod length, valve timing, idle and limiter) is illustrative.
 
 - `npm run build:wasm` builds `garage/public/wasm/p60.wasm` (needs Rust and `rustup target add wasm32-unknown-unknown`) after running `cargo test`. The binary is committed, so the site build needs no Rust; `npm test` fails if it is older than the crate's sources.
-- `npm run build:internals` models the moving parts with `garage/tools/blender/build_internals.py` and writes `garage/public/models/p60b40-internals.glb`. The cam lobes are cut from the crate's timing, and `npm test` checks they still meet their valves at peak lift.
-- `cargo run --release --example render -- out.wav [--turbo]` (in `garage/crates/p60`) renders a test drive to a WAV file and prints each phase's level and spectrum, for listening to and tuning the sound.
+- `npm run build:internals` models the moving parts with `garage/tools/blender/build_internals.py` and writes `garage/public/models/p60b40-internals.glb`. The cam lobes are cut from the crate's timing, and `npm test` checks they still meet their valves at peak lift. The x-ray also shows the timing chains, valve springs, the dry-sump pump's rotors and oil jets under the pistons, all illustrative.
+- `cargo run --release --example render -- out.wav [--turbo] [--gears]` (in `garage/crates/p60`) renders a test drive to a WAV file and prints each phase's level and spectrum, for listening to and tuning the sound. `--gears` drives through the gears on the rolling road instead.
 - With the hood open the belt drive turns and the throttles open. In the x-ray, each injector sprays, each plug sparks, and air, exhaust, fuel, oil and coolant move along their pipes. The engine model carries each pipe's centreline (`Flow_*` nodes) for that.
 - "Game turbo" bolts on a twin-turbo kit that exists only in *Most Wanted* (the real engine is naturally aspirated), with spool whistle and blow-off in the sound. `npm run build:turbo` models it with `garage/tools/blender/build_turbo.py`.
+
+### Gears and the rolling road
+
+The car sits with its rear wheels on a rolling road. With the engine running, the dock's shift buttons (or the arrow keys) change gear, and revving drives the rear wheels. The crate models the clutch, the six-speed gearbox, the final drive and the car's 1,120 kg and drag on the rollers, so a higher gear revs more slowly and changing up drops the revs. The "Gearbox and drive" hotspot shows the driveline through an x-ray of the body, slowed 40×, with the drive's path through the gears lit, and a chart of what each gear does. The clutch, the straight-cut six-speed and the limited-slip differential are from BMW's 2001 release; the ratios, layout and tyre size are illustrative.
+
+- `npm run build:drivetrain` models the clutch, gearbox, propshaft, differential and rollers with `garage/tools/blender/build_drivetrain.py` and writes `garage/public/models/drivetrain.glb`. The tooth counts come from `p60.wasm` and the positions from the car and engine models, and `npm test` checks the gears, the axle and the rollers agree with them.
+- `npm run prepare:car` splits the rear wheels out of the car model as pivots that turn.
 
 ### Most Wanted radio
 

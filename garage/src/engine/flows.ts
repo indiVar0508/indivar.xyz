@@ -1,16 +1,19 @@
 import { AdditiveBlending, BufferAttribute, BufferGeometry, CatmullRomCurve3, Color, Group, Points, ShaderMaterial, Vector3, type Object3D } from 'three';
 
-/** What runs through a pipe in the x-ray, or a spark at a plug. */
-export type FlowKind = 'air' | 'exhaust' | 'oil' | 'coolant' | 'fuel' | 'charge' | 'spray' | 'spark';
-export type FlowPath = { name: string; kind: FlowKind; points: Vector3[]; cylinder: number | null };
+/** What runs through a pipe in the x-ray, a spark at a plug, an oil jet under a piston, or a timing chain's links. */
+export type FlowKind = 'air' | 'exhaust' | 'oil' | 'coolant' | 'fuel' | 'charge' | 'spray' | 'spark' | 'jet' | 'chain';
+/** `radius` is a chain's crank sprocket pitch radius, which sets how far the chain runs per radian of crank. */
+export type FlowPath = { name: string; kind: FlowKind; points: Vector3[]; cylinder: number | null; radius?: number | null };
 
 /** Metres between particles along a pipe. */
 export const SPACING = 0.03;
+/** A 3/8-inch timing chain's pitch: one particle per link. Illustrative: no source gives the P60B40's cam drive. */
+export const CHAIN_PITCH = 0.0095;
 /** Particles in an exhaust pulse's slug. */
 const SLUG = 6;
 
 /** Colour (brighter than white where the bloom pass should catch it) and particle size in metres. */
-const STYLE: Record<FlowKind, { color: [number, number, number]; size: number; onTop?: boolean }> = {
+const STYLE: Record<FlowKind, { color: [number, number, number]; size: number; onTop?: boolean; spacing?: number }> = {
   air: { color: [0.5, 0.85, 1.5], size: 0.009 },
   exhaust: { color: [3, 1.1, 0.25], size: 0.016 },
   oil: { color: [1.4, 0.85, 0.12], size: 0.009 },
@@ -19,6 +22,8 @@ const STYLE: Record<FlowKind, { color: [number, number, number]; size: number; o
   spray: { color: [1.9, 1.6, 0.55], size: 0.006 },
   charge: { color: [0.6, 0.95, 2], size: 0.012 },
   spark: { color: [2.6, 2.9, 4.5], size: 0.022 },
+  jet: { color: [1.6, 1.0, 0.15], size: 0.006, spacing: 0.012 },
+  chain: { color: [0.9, 0.95, 1.1], size: 0.007, spacing: CHAIN_PITCH },
 };
 
 /** The Flow_* paths under `root`, from their glTF extras: a kind, flattened points, and a cylinder for per-cylinder pipes. */
@@ -26,9 +31,9 @@ export function readFlows(root: Object3D): FlowPath[] {
   const flows: FlowPath[] = [];
   root.traverse((node) => {
     if (!node.name.startsWith('Flow_')) return;
-    const { kind, points, cylinder } = node.userData as { kind: FlowKind; points: number[]; cylinder?: number };
+    const { kind, points, cylinder, radius } = node.userData as { kind: FlowKind; points: number[]; cylinder?: number; radius?: number };
     const at = (i: number) => new Vector3(points[i * 3], points[i * 3 + 1], points[i * 3 + 2]);
-    flows.push({ name: node.name, kind, cylinder: cylinder ?? null, points: Array.from({ length: points.length / 3 }, (_, i) => at(i)) });
+    flows.push({ name: node.name, kind, cylinder: cylinder ?? null, radius: radius ?? null, points: Array.from({ length: points.length / 3 }, (_, i) => at(i)) });
   });
   return flows;
 }
@@ -62,7 +67,7 @@ void main() {
   });
 }
 
-type Line = { curve: CatmullRomCurve3; length: number; first: number; count: number; cloud: Cloud };
+type Line = { curve: CatmullRomCurve3; length: number; spacing: number; first: number; count: number; cloud: Cloud };
 type Cloud = { positions: Float32Array; alpha: Float32Array; geometry: BufferGeometry; material: ShaderMaterial };
 
 /** Particles moving along pipes: one point cloud per kind of fluid, so a whole engine's flow is a few draw calls. */
@@ -74,10 +79,11 @@ export class FlowField {
 
   constructor(paths: FlowPath[]) {
     for (const kind of new Set(paths.map((path) => path.kind))) {
+      const spacing = STYLE[kind].spacing ?? SPACING;
       const own = paths.filter((path) => path.kind === kind).map((path) => {
         const curve = new CatmullRomCurve3(path.points, false, 'centripetal');
         const length = curve.getLength();
-        return { path, curve, length, count: Math.max(2, Math.floor(length / SPACING)) };
+        return { path, curve, length, count: Math.max(2, Math.floor(length / spacing)) };
       });
       const total = own.reduce((sum, line) => sum + line.count, 0);
       const cloud: Cloud = { positions: new Float32Array(total * 3), alpha: new Float32Array(total), geometry: new BufferGeometry(), material: cloudMaterial(kind) };
@@ -90,7 +96,7 @@ export class FlowField {
       this.clouds.push(cloud);
       let first = 0;
       for (const { path, curve, length, count } of own) {
-        this.lines.set(path.name, { curve, length, first, count, cloud });
+        this.lines.set(path.name, { curve, length, spacing, first, count, cloud });
         first += count;
       }
     }
@@ -104,7 +110,7 @@ export class FlowField {
   stream(name: string, offset: number, level: number): void {
     const line = this.lines.get(name)!;
     for (let i = 0; i < line.count; i++) {
-      const along = (((i * SPACING + offset) % line.length) + line.length) % line.length;
+      const along = (((i * line.spacing + offset) % line.length) + line.length) % line.length;
       this.place(line, i, along / line.length, level);
     }
   }
@@ -113,7 +119,7 @@ export class FlowField {
   slug(name: string, head: number, level: number): void {
     const line = this.lines.get(name)!;
     for (let i = 0; i < line.count; i++) {
-      const at = head - (i * SPACING) / line.length;
+      const at = head - (i * line.spacing) / line.length;
       this.place(line, i, Math.max(0, at), i < SLUG && head >= 0 && at >= 0 ? level * (1 - i / SLUG) : 0);
     }
   }

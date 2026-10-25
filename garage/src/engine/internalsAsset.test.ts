@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 import { NodeIO, type Node } from '@gltf-transform/core';
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
 import { MeshoptDecoder } from 'meshoptimizer';
-import { Matrix4, Vector3 } from 'three';
+import { Matrix4, Quaternion, Vector3 } from 'three';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { cylinderLayout } from './geometry';
 import { instantiateP60, type P60Exports } from './p60';
@@ -66,6 +66,43 @@ describe('p60b40-internals.glb', () => {
         }
         expect(cz).toBeCloseTo(cylinderLayout().filter((c) => c.bank === bank).reduce((sum, c) => sum + c.center[2], 0) / 4, 4);
       }
+    }
+  });
+
+  it('stands each pair of valve springs on its stems, reaching up to the bucket', () => {
+    for (const cylinder of cylinderLayout()) {
+      for (const kind of ['in', 'ex'] as const) {
+        const springs = nodes.get(`Springs_${cylinder.number}_${kind}`)!;
+        const valve = nodes.get(`Valve_${cylinder.number}_${kind}`)!;
+        const axis = new Vector3(...(valve.getExtras().axis as [number, number, number]));
+        const length = springs.getExtras().length as number;
+        const seat = new Vector3(...springs.getTranslation());
+        const fromFace = seat.clone().sub(new Vector3(...valve.getTranslation()));
+        expect(fromFace.clone().normalize().dot(axis), springs.getName()).toBeCloseTo(1, 4); // on the stem's line
+        expect(fromFace.length() + length, springs.getName()).toBeCloseTo(0.088, 4); // up to the bucket's underside
+        // Its own +y runs up the stem, so scaling y compresses it along the stem.
+        const up = new Vector3(0, 1, 0).applyQuaternion(new Quaternion(...springs.getRotation()));
+        expect(up.dot(axis), springs.getName()).toBeCloseTo(1, 4);
+      }
+    }
+  });
+
+  it('runs each timing chain on its bank’s sprocket plane, round a crank sprocket half the cams’ size', () => {
+    const crank = vertices('Crank');
+    for (const bank of ['right', 'left'] as const) {
+      const chain = nodes.get(`Flow_chain_${bank}`)!.getExtras() as { points: number[]; radius: number };
+      const z = chain.points[2]!;
+      expect(chain.points.filter((_, i) => i % 3 === 2).every((v) => v === z)).toBe(true);
+      expect(chain.points.slice(0, 3)).toEqual(chain.points.slice(-3)); // a closed loop
+      for (const kind of ['in', 'ex'] as const) {
+        const cam = nodes.get(`Cam_${bank}_${kind}`)!;
+        const [cx, cy] = cam.getTranslation();
+        const teeth = vertices(cam.getName()).filter((p) => Math.abs(p.z - z) < 0.0045 && Math.hypot(p.x - cx, p.y - cy) > 0.03);
+        expect(teeth.length, `${cam.getName()} sprocket on the chain`).toBeGreaterThan(0);
+        expect(Math.max(...teeth.map((p) => Math.hypot(p.x - cx, p.y - cy)))).toBeCloseTo(2 * chain.radius + 0.002, 3);
+      }
+      const sprocket = crank.filter((p) => Math.abs(p.z - z) < 0.0045 && Math.hypot(p.x, p.y) < 0.03);
+      expect(Math.max(...sprocket.map((p) => Math.hypot(p.x, p.y)))).toBeCloseTo(chain.radius + 0.002, 3);
     }
   });
 });

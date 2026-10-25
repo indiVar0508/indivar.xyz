@@ -1,6 +1,6 @@
 import { Group, Object3D, Vector3 } from 'three';
 import { describe, expect, it } from 'vitest';
-import { FlowField, readFlows, SPACING } from './flows';
+import { CHAIN_PITCH, FlowField, readFlows, SPACING } from './flows';
 
 /** Flow_* nodes as GLTFLoader gives them: their extras in userData, the points flattened. */
 function withFlows(): Group {
@@ -19,7 +19,22 @@ describe('readFlows', () => {
       ['Flow_oil_to_tank', 'oil', 3, null],
       ['Flow_exhaust_3', 'exhaust', 2, 3],
     ]);
+    expect(flows[0]!.radius).toBeNull();
     expect(flows[0]!.points[1]).toEqual(new Vector3(0.5, 0, 0));
+  });
+});
+
+describe('timing chains', () => {
+  it('reads a chain’s sprocket radius, and spaces its links a chain’s pitch apart', () => {
+    const root = new Group();
+    root.add(Object.assign(new Object3D(), { name: 'Flow_chain_right', userData: { kind: 'chain', radius: 0.019, points: [0, 0, 0, 0.5, 0, 0] } }));
+    const [chain] = readFlows(root);
+    expect(chain!.radius).toBe(0.019);
+    const field = new FlowField([chain!]);
+    expect(field.particles('Flow_chain_right')).toHaveLength(Math.floor(0.5 / CHAIN_PITCH));
+    field.stream('Flow_chain_right', 0, 1);
+    const [a, b] = field.particles('Flow_chain_right');
+    expect(b!.position.x - a!.position.x).toBeCloseTo(CHAIN_PITCH, 4);
   });
 });
 
