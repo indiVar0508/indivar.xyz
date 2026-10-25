@@ -14,6 +14,11 @@ class AudioController {
   private turbo = false;
   /** Told whenever the engine's status changes on the audio thread. */
   onEngineStatus: (status: EngineStatus) => void = () => undefined;
+  /** Told whenever the gearbox changes gear. */
+  onGear: (gear: number) => void = () => undefined;
+  /** Told when the gearbox refuses a change, with its direction. */
+  onShiftRefused: (up: boolean) => void = () => undefined;
+  private lastShiftUp = true;
 
   async setEnabled(on: boolean): Promise<void> {
     if (!on) {
@@ -51,9 +56,13 @@ class AudioController {
   /** Starts the P60B40. Turns the audio on first if it isn't; rejects if the engine sound can't load here. */
   async startEngine(): Promise<void> {
     await this.setEnabled(true);
-    this.engine ??= EngineSound.create(this.ctx!, this.master!, (status) => {
-      this.duck();
-      this.onEngineStatus(status);
+    this.engine ??= EngineSound.create(this.ctx!, this.master!, {
+      status: (status) => {
+        this.duck();
+        this.onEngineStatus(status);
+      },
+      gear: (gear) => this.onGear(gear),
+      refused: () => this.onShiftRefused(this.lastShiftUp),
     }).catch((error: unknown) => {
       this.engine = null;
       throw error;
@@ -71,6 +80,12 @@ class AudioController {
   setTurbo(fitted: boolean): void {
     this.turbo = fitted;
     void this.engine?.then((engine) => engine.turbo(fitted));
+  }
+
+  /** Changes up or down a gear, if the engine has loaded. */
+  shift(up: boolean): void {
+    this.lastShiftUp = up;
+    void this.engine?.then((engine) => engine.shift(up));
   }
 
   /** The accelerator, 0 to 1. */

@@ -1,7 +1,7 @@
 import { SOURCES as S } from './sources';
 import type { Topic } from './types';
 
-export const CAR_TOPIC_IDS = ['hood', 'front-aero', 'rear-wing', 'wheels', 'history', 'livery'] as const;
+export const CAR_TOPIC_IDS = ['hood', 'front-aero', 'rear-wing', 'wheels', 'drivetrain', 'history', 'livery'] as const;
 export type CarTopicId = (typeof CAR_TOPIC_IDS)[number];
 
 export const CAR_TOPICS: Record<CarTopicId, Topic<CarTopicId>> = {
@@ -48,6 +48,24 @@ export const CAR_TOPICS: Record<CarTopicId, Topic<CarTopicId>> = {
     ],
     game: [
       { text: 'On the box art the car wears ADR M Sport wheels, not the BBS Motorsport RE594 and RE595 wheels fans associate with the race car.', badge: 'game-lore', sources: [S.nfsCar] },
+    ],
+  },
+  drivetrain: {
+    id: 'drivetrain',
+    title: 'Gearbox and drive',
+    summary: 'A straight-cut six-speed to the rear wheels, on the rolling road.',
+    real: [
+      { text: 'A triple-disc carbon-fibre clutch and a straight-cut six-speed manual gearbox.', badge: 'verified', sources: [S.bmwPress2001] },
+      { text: 'A differential with a viscous limited-slip lock drives the rear wheels.', badge: 'verified', sources: [S.bmwPress2001] },
+      { text: 'The race car’s minimum weight was 1,120 kg.', badge: 'verified', sources: [S.bmwPress2001] },
+      { text: 'A lower gear multiplies the engine’s torque more, so the car pulls harder but runs out of revs at a lower speed. A higher gear trades that pull for speed, so the engine revs up more slowly.', badge: 'illustrative', sources: [] },
+      { text: 'Straight-cut gears are strong and waste little power, but they whine, loudest under load. Listen for it as you rev in gear.', badge: 'illustrative', sources: [] },
+      { text: 'The rollers stand in for the road. They load the rear wheels with the car’s weight and drag, so changing up drops the revs to suit the road speed.', badge: 'illustrative', sources: [] },
+      { text: 'In the x-ray, slowed 40×: the dog ring locks the chosen gear to the output shaft, while the others spin free at their own speeds. A slipping clutch shows as the flywheel and the discs turning apart.', badge: 'illustrative', sources: [] },
+      { text: 'The ratios, the 3.85:1 final drive, the tyre size, the gearbox’s layout and where it sits are illustrative: no source gives them.', badge: 'illustrative', sources: [] },
+    ],
+    game: [
+      { text: 'Most Wanted sells transmission upgrades in its Race, Pro, Super Pro and Ultimate packages.', badge: 'game-lore', sources: [S.nfsPerformance] },
     ],
   },
   history: {

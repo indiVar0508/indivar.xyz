@@ -15,3 +15,9 @@ export const spinStep = (rpm: number, ratio: number, dt: number): number => Math
 
 /** A throttle butterfly's angle (degrees from shut-square) for an engine load of 0 to 1. */
 export const butterflyAngle = (load: number): number => BUTTERFLY_SHUT + (90 - BUTTERFLY_SHUT) * Math.max(0, Math.min(1, load));
+
+/** Radians the wheels turn in `dt` at `wheel` rad/s: slowed with the x-ray, or outside it their real speed, capped. */
+export const wheelTurn = (wheel: number, dt: number, xray: boolean): number => (xray ? wheel / SLOW_MOTION : Math.min(wheel, (MAX_SPIN * Math.PI) / 180)) * dt;
+
+/** Radians the crank turns in `dt` in the x-ray. */
+export const crankTurn = (rpm: number, dt: number): number => (slowStep(rpm, dt) * Math.PI) / 180;

@@ -49,6 +49,7 @@ export const CAR_SHOTS: Record<CarShotId, Shot> = {
   'front-aero': { position: [1.9, 0.75, 4.6], target: [0, 0.3, 2.0] },
   'rear-wing': { position: [-2.8, 2.1, -4.6], target: [0, 1.1, -1.9] },
   wheels: { position: [3.3, 0.75, 2.9], target: [0.9, 0.35, 1.4] },
+  drivetrain: { position: [4.15, 2.66, -2.35], target: [0, 0.45, -0.5] }, // from behind the left side, so the driveline runs clear of the panel
   history: { position: [4.6, 1.3, -0.6], target: [0, 0.65, -0.2] },
   livery: { position: [-4.4, 2.6, 2.6], target: [0, 0.7, 0.1] },
 };

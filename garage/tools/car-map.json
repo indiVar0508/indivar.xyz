@@ -4,6 +4,8 @@
   "hood": ["blinn8", "aw", "sd", "lambert15"],
   "glass": "wind",
   "tyres": "tyre",
+  "wheelParts": ["tyre", "blinn1", "breka"],
+  "drivenWheels": ["RL", "RR"],
   "paint": ["blinn3", "blinn8", "blinn9", "blinn10", "blinn12", "blinn13", "blinn14", "blinn18"],
   "rename": {
     "blinn8": "Hood_Panel",

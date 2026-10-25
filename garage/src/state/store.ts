@@ -28,6 +28,10 @@ export type GarageStore = {
   inside: boolean;
   /** The game turbo kit is fitted. The real P60B40 is naturally aspirated; this is not remembered between visits. */
   turbo: boolean;
+  /** The gear the gearbox last reported: 0 is neutral, 1 to 6 the gears. */
+  gear: number;
+  /** Why the gearbox refused the last change, until the next one. */
+  driveNote: string | null;
   dispatch: (action: ViewAction) => void;
   setQuality: (quality: Quality) => void;
   setReady: () => void;
@@ -42,6 +46,8 @@ export type GarageStore = {
   setEngineError: (message: string | null) => void;
   setInside: (inside: boolean) => void;
   setTurbo: (fitted: boolean) => void;
+  setGear: (gear: number) => void;
+  setDriveNote: (note: string | null) => void;
 };
 
 const inBrowser = typeof window !== 'undefined';
@@ -64,6 +70,8 @@ export const useGarage = create<GarageStore>()((set) => ({
   engineError: null,
   inside: false,
   turbo: false,
+  gear: 0,
+  driveNote: null,
   dispatch: (action) =>
     set((state) => {
       const view = reduceView(state.view, action);
@@ -83,4 +91,6 @@ export const useGarage = create<GarageStore>()((set) => ({
   setEngineError: (engineError) => set({ engineError }),
   setInside: (inside) => set((state) => ({ inside: inside && isHoodOpen(state.view) })),
   setTurbo: (turbo) => set({ turbo }),
+  setGear: (gear) => set({ gear, driveNote: null }),
+  setDriveNote: (driveNote) => set({ driveNote }),
 }));

@@ -6,9 +6,11 @@
 //! which is where the wail comes from. Intake suction rings the airbox and pulls rush through the restrictors; the
 //! valvetrain ticks; the block rings; the starter whines and chugs on each compression; unburned fuel pops in the
 //! exhaust on the overrun and at the limiter. With the game turbo kit fitted, the compressor whistles as it spools,
-//! the blow-off valve hisses when the throttle snaps shut, and the turbines soften the exhaust.
+//! the blow-off valve hisses when the throttle snaps shut, and the turbines soften the exhaust. On the rolling road
+//! the straight-cut gears whine, loudest under load, and the tyres hum on the rollers.
 
-use crate::engine::{Engine, Status, LIMIT_RPM};
+use crate::drivetrain::{CONSTANT_MESH, GEAR_TEETH, TYRE_RADIUS};
+use crate::engine::{Engine, Status, LIMIT_RPM, PEAK_TORQUE};
 use crate::timing::{bank, fire_angle, valve_events, CYLINDERS};
 use core::f32::consts::TAU;
 
@@ -158,6 +160,9 @@ pub struct Synth {
     starter_tone: Biquad,
     hiss_tone: Biquad,
     blowoff_tone: Biquad,
+    roller_tone: Biquad,
+    /// Phases of the constant-mesh pair's whine and the engaged pair's.
+    whine: [f32; 2],
     /// The turbines take the edge off the exhaust: a lowpass blended in by `fitted`.
     turbine: [f32; 2],
     turbine_coeff: f32,
@@ -213,6 +218,8 @@ impl Synth {
             starter_tone: Biquad::bandpass(2800.0, 2.0, sample_rate),
             hiss_tone: Biquad::bandpass(4200.0, 1.2, sample_rate),
             blowoff_tone: Biquad::bandpass(1900.0, 0.7, sample_rate),
+            roller_tone: Biquad::bandpass(650.0, 0.9, sample_rate),
+            whine: [0.0; 2],
             turbine: [0.0; 2],
             turbine_coeff: one_pole(1800.0, sample_rate),
             fitted: 0.0,
@@ -239,7 +246,7 @@ impl Synth {
 
     pub fn render(&mut self, frames: usize) {
         let frames = frames.min(MAX_FRAMES);
-        if self.engine.status == Status::Off && self.level < 1e-4 {
+        if self.engine.status == Status::Off && self.engine.drive.wheel <= 0.0 && self.level < 1e-4 {
             self.level = 0.0;
             self.out[..frames].fill(0.0);
             self.out[MAX_FRAMES..MAX_FRAMES + frames].fill(0.0);
@@ -347,11 +354,12 @@ impl Synth {
         }
 
         let turbo = self.turbo_sound();
-        let common = intake + click + ring * 0.06 + starter + turbo;
+        let gears = self.gear_sound();
+        let common = intake + click + ring * 0.06 + starter + turbo + gears;
         let left = exhaust[0] * 0.65 + exhaust[1] * 0.35 + common;
         let right = exhaust[0] * 0.35 + exhaust[1] * 0.65 + common;
 
-        let audible = self.engine.status != Status::Off || self.engine.rpm > 0.0;
+        let audible = self.engine.status != Status::Off || self.engine.rpm > 0.0 || self.engine.drive.wheel > 0.5;
         self.level += ((if audible { 1.0 } else { 0.0 }) - self.level) * (self.dt / 0.05).min(1.0);
         let gain = OUTPUT_GAIN * self.level;
         (self.finish(0, left) * gain, self.finish(1, right) * gain)
@@ -374,6 +382,27 @@ impl Synth {
         let dump = self.blowoff_tone.tick(self.rng.noise()) * 0.8 * self.blowoff;
         self.blowoff *= self.blowoff_decay;
         whistle + hiss + dump
+    }
+
+    /// Straight-cut gears whine at their tooth-meshing frequency: the constant-mesh pair whenever the input shaft
+    /// turns, the engaged pair in gear, both much louder when they carry torque. The tyres hum on the rollers.
+    pub(crate) fn gear_sound(&mut self) -> f32 {
+        let drive = &self.engine.drive;
+        let input = self.engine.rpm / 60.0;
+        let road = drive.wheel * TYRE_RADIUS;
+        if input < 1.0 && road < 0.05 {
+            return 0.0;
+        }
+        let load = (drive.clutch.abs() / PEAK_TORQUE).min(1.5);
+        self.whine[0] = (self.whine[0] + input * CONSTANT_MESH.0 as f32 * self.dt).fract();
+        let mut whine = (TAU * self.whine[0]).sin() * (0.0012 + 0.016 * load);
+        if drive.gear > 0 {
+            let layshaft = input * CONSTANT_MESH.0 as f32 / CONSTANT_MESH.1 as f32;
+            self.whine[1] = (self.whine[1] + layshaft * GEAR_TEETH[drive.gear - 1].0 as f32 * self.dt).fract();
+            whine += (TAU * self.whine[1]).sin() * 0.012 * load;
+        }
+        let hum = self.roller_tone.tick(self.rng.noise()) * 0.06 * (road / 70.0).min(1.2);
+        whine + hum
     }
 
     /// Soft saturation, then a DC blocker.
@@ -531,6 +560,28 @@ mod tests {
         assert_eq!(synth.engine.blowoff, 0.0, "taken");
         hiss(&mut synth, 1.5);
         assert!(rms(&hiss(&mut synth, 0.1)) < 0.002, "gone");
+    }
+
+    #[test]
+    fn straight_cut_gears_whine_under_load_and_the_rollers_hum_with_speed() {
+        let sound = |synth: &mut Synth| (0..(0.2 * RATE) as usize).map(|_| synth.gear_sound()).collect::<Vec<_>>();
+        let mut synth = Synth::new(RATE, 17);
+        assert!(sound(&mut synth).iter().all(|&v| v == 0.0), "silent when nothing turns");
+        synth.engine.rpm = 4200.0;
+        let neutral = sound(&mut synth);
+        synth.engine.drive.gear = 3;
+        synth.engine.drive.clutch = 400.0;
+        synth.engine.drive.wheel = 4200.0 * core::f32::consts::PI / 30.0 / crate::drivetrain::overall_ratio(3);
+        let loaded = sound(&mut synth);
+        let mesh = 4200.0 / 60.0 * crate::drivetrain::CONSTANT_MESH.0 as f32;
+        assert!(power(&loaded, mesh) > 10.0 * power(&neutral, mesh), "whine {} vs {}", power(&loaded, mesh), power(&neutral, mesh));
+        assert!(loaded.iter().all(|v| v.is_finite() && v.abs() < 0.2));
+        synth.engine.rpm = 0.0;
+        synth.engine.drive.clutch = 0.0;
+        let rolling = sound(&mut synth);
+        synth.engine.drive.wheel *= 0.3;
+        let slower = sound(&mut synth);
+        assert!(rms(&rolling) > 2.0 * rms(&slower), "roller hum {} vs {}", rms(&rolling), rms(&slower));
     }
 
     #[test]

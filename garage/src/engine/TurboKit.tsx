@@ -6,7 +6,7 @@ import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.j
 import { engineLive } from '../audio/engineSound';
 import { QA } from '../qa';
 import { useGarage } from '../state/store';
-import { isHoodOpen } from '../state/view';
+import { isDriveView, isHoodOpen } from '../state/view';
 import { FlowField, readFlows } from './flows';
 import { Optional } from './Internals';
 import { spinStep } from './motion';
@@ -44,6 +44,7 @@ function Kit({ rig }: { rig: EngineRig }) {
   const gltf = useLoader(GLTFLoader, TURBO_URL, (loader) => loader.setMeshoptDecoder(MeshoptDecoder));
   const kit = useMemo(() => prepareTurbo(gltf.scene), [gltf]);
   const xray = useGarage((state) => state.inside && isHoodOpen(state.view));
+  const ghosted = useGarage((state) => isDriveView(state.view)) || xray;
   const ghost = useMemo(ghostMaterial, []);
   const size = useThree((state) => state.size);
   const camera = useThree((state) => state.camera);
@@ -60,11 +61,11 @@ function Kit({ rig }: { rig: EngineRig }) {
 
   useEffect(() => {
     for (const [mesh, material] of kit.solid) {
-      mesh.material = xray ? ghost : material;
-      mesh.castShadow = !xray;
+      mesh.material = ghosted ? ghost : material;
+      mesh.castShadow = !ghosted;
     }
     kit.flows.group.visible = xray;
-  }, [kit, xray, ghost]);
+  }, [kit, xray, ghosted, ghost]);
 
   useFrame((state, dt) => {
     const { boost, rpm, status } = engineLive;

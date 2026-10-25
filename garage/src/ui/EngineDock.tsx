@@ -1,6 +1,8 @@
-import { useEffect, useRef } from 'react';
+import { Suspense, use, useEffect, useRef } from 'react';
 import { audio } from '../audio/controller';
 import { engineLive } from '../audio/engineSound';
+import { gearLabel, kmh } from '../drive/gears';
+import { loadKinematics } from '../engine/p60';
 import { useGarage } from '../state/store';
 import { isHoodOpen } from '../state/view';
 
@@ -115,12 +117,62 @@ function RevButton() {
   );
 }
 
-/** Start and stop the P60B40, rev it, read the tach, and look inside it. */
+/**
+ * Changes gear, by the buttons or the arrow keys, and shows the gear and the road speed on the rollers. Presses come
+ * no faster than a change takes, so the gearbox never refuses one for being mid-change.
+ */
+function GearControls() {
+  const box = use(loadKinematics()).gearbox;
+  const gear = useGarage((state) => state.gear);
+  const speed = useRef<HTMLSpanElement>(null);
+  const last = useRef(-Infinity);
+  const shift = (up: boolean) => {
+    const now = performance.now();
+    if (now - last.current < box.shiftSeconds * 1000 + 30) return;
+    last.current = now;
+    audio.shift(up);
+  };
+  const shiftRef = useRef(shift);
+  shiftRef.current = shift;
+  useEffect(() => {
+    const down = (event: KeyboardEvent) => {
+      if ((event.key !== 'ArrowUp' && event.key !== 'ArrowDown') || event.repeat || event.ctrlKey || event.metaKey || event.altKey || typing(event.target)) return;
+      event.preventDefault();
+      shiftRef.current(event.key === 'ArrowUp');
+    };
+    window.addEventListener('keydown', down);
+    let frame = requestAnimationFrame(function draw() {
+      speed.current!.textContent = `${Math.round(kmh(box, engineLive.wheel))} km/h`;
+      frame = requestAnimationFrame(draw);
+    });
+    return () => {
+      window.removeEventListener('keydown', down);
+      cancelAnimationFrame(frame);
+    };
+  }, [box]);
+  return (
+    <div className="engine-gears" role="group" aria-label="Gearbox">
+      <button type="button" className="hud-button" aria-label="Shift down" onClick={() => shift(false)}>
+        <span aria-hidden="true">▼</span> <kbd>↓</kbd>
+      </button>
+      <p className="gear-readout">
+        <span className="gear-now" aria-label={gear === 0 ? 'Neutral' : `Gear ${gear}`}>{gearLabel(gear)}</span>
+        <span ref={speed} className="gear-speed">0 km/h</span>
+      </p>
+      <button type="button" className="hud-button" aria-label="Shift up" onClick={() => shift(true)}>
+        <span aria-hidden="true">▲</span> <kbd>↑</kbd>
+      </button>
+    </div>
+  );
+}
+
+/** Start and stop the P60B40, rev it, change gear, read the tach, and look inside it. */
 export function EngineDock() {
   const engine = useGarage((state) => state.engine);
   const error = useGarage((state) => state.engineError);
   const inside = useGarage((state) => state.inside);
   const turbo = useGarage((state) => state.turbo);
+  const driveNote = useGarage((state) => state.driveNote);
   const stopped = engine === 'off' || engine === 'stopping';
   return (
     <section className="engine-dock" aria-label="Engine">
@@ -135,6 +187,11 @@ export function EngineDock() {
       )}
       {!stopped && <Tach key={String(turbo)} turbo={turbo} />}
       {engine === 'running' && <RevButton />}
+      {engine === 'running' && (
+        <Suspense fallback={null}>
+          <GearControls />
+        </Suspense>
+      )}
       <button type="button" className="hud-button" aria-label="Look inside" aria-pressed={inside} onClick={toggleInside}>
         <Label long="Look inside" short="Inside" />
       </button>
@@ -142,7 +199,7 @@ export function EngineDock() {
         <Label long="Game turbo" short="Turbo" />
       </button>
       <p className="engine-note" role="status">
-        {error ?? (turbo ? 'Game turbo kit fitted. It’s only in Most Wanted: the real P60B40 has no turbo.' : '')}
+        {error ?? driveNote ?? (turbo ? 'Game turbo kit fitted. It’s only in Most Wanted: the real P60B40 has no turbo.' : '')}
       </p>
     </section>
   );

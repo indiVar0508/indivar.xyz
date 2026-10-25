@@ -9,7 +9,7 @@ import { QA } from '../qa';
 import { ENGINE_TOPIC_IDS, type EngineTopicId } from '../content/engine';
 import type { Vec3 } from '../math';
 import { useGarage } from '../state/store';
-import { isHoodOpen } from '../state/view';
+import { isDriveView, isHoodOpen } from '../state/view';
 import { Internals } from './Internals';
 import { insideLive } from './live';
 import { ENGINE_PARTS } from './manifest';
@@ -36,7 +36,8 @@ export const ENGINE_URL = `${import.meta.env.BASE_URL}models/p60b40.glb`;
  * in car space. With the hood open, clicking a part opens its topic and the selected part glows. Parts take clicks
  * only, not hover, so the pointer never raycasts the whole engine as it moves. `hood` is the car's hood pivot.
  * While it runs, the engine shakes on its mounts, its belt drive turns and its throttles open; looking inside turns it
- * to an x-ray around its moving parts. The game turbo kit bolts on when its switch is on.
+ * to an x-ray around its moving parts. In the gearbox and drive view it shows as an x-ray through the body, without
+ * the bay. The game turbo kit bolts on when its switch is on.
  */
 export function Engine({ origin, hood, hotspots }: { origin: Vec3; hood: Object3D; hotspots?: (id: EngineTopicId, selected: boolean) => ReactNode }) {
   const gl = useThree((state) => state.gl);
@@ -49,6 +50,7 @@ export function Engine({ origin, hood, hotspots }: { origin: Vec3; hood: Object3
   const open = isHoodOpen(view);
   const selected = view.kind === 'bay-part' ? view.id : null;
   const inside = useGarage((state) => state.inside) && open;
+  const drive = useGarage((state) => isDriveView(state.view));
   const shake = useMemo(newShake, []);
   const throttle = useMemo(() => ({ angle: butterflyAngle(0) }), []);
 
@@ -56,13 +58,17 @@ export function Engine({ origin, hood, hotspots }: { origin: Vec3; hood: Object3
     rig.engine.position.set(...origin);
   }, [rig, origin]);
   useEffect(() => setHighlight(rig, open ? selected : null), [rig, open, selected]);
-  useEffect(() => setXray(rig, inside, selected), [rig, inside, selected]);
+  useEffect(() => setXray(rig, inside || drive, selected), [rig, inside, drive, selected]);
+  useEffect(() => {
+    rig.bay.visible = !drive;
+  }, [rig, drive]);
   useEffect(() => {
     if (QA) Object.assign(window, { garageBelt: () => rig.spins.map(({ node }) => node.rotation.z) });
   }, [rig]);
   useFrame((_, dt) => {
-    // Nothing sees the engine while the hood is shut (the radiator fills the grille), so skip drawing it then.
-    rig.engine.visible = hood.rotation.x !== 0;
+    // Nothing sees the engine while the hood is shut (the radiator fills the grille), so skip drawing it then, unless
+    // the body is an x-ray around the driveline.
+    rig.engine.visible = hood.rotation.x !== 0 || isDriveView(useGarage.getState().view);
     const [x, y] = stepShake(shake, engineLive.rpm, engineLive.status !== 'off', dt);
     const still = useGarage.getState().reducedMotion;
     rig.engine.position.set(origin[0] + (still ? 0 : x), origin[1] + (still ? 0 : y), origin[2]);

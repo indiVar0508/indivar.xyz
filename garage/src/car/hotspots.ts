@@ -13,6 +13,8 @@ export function carHotspot(id: CarTopicId, anchors: CarAnchors): { position: Vec
       return { position: [0, 1.36, -2.0], normal: [0, 1, -0.5] };
     case 'wheels':
       return { position: [anchors.wheelFL[0] + 0.14, anchors.wheelFL[1], anchors.wheelFL[2]], normal: [1, 0, 0] };
+    case 'drivetrain':
+      return { position: [1.0, 0.24, anchors.wheelRL[2] + 0.55], normal: [1, -0.15, 0] };
     case 'history':
       return { position: [1.02, 0.62, -0.25], normal: [1, 0, 0] };
     case 'livery':

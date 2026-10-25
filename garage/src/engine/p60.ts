@@ -3,6 +3,8 @@
  * The same bytes run twice: in an AudioWorklet for the sound (audio/engineSound.ts) and here for the moving parts.
  */
 
+import type { Gearbox } from '../drive/gears';
+
 export const P60_WASM_URL = `${import.meta.env.BASE_URL}wasm/p60.wasm`;
 
 export type P60Exports = {
@@ -14,10 +16,11 @@ export type P60Exports = {
   p60_bank_angle(cylinder: number): number;
   p60_pin_phase(cylinder: number): number;
   p60_constant(id: number): number;
+  p60_gearbox(id: number): number;
 };
 
 /** Indexes for `p60_constant`. */
-export const P60_CONSTANT = { crankRadius: 0, rodLength: 1, compressionHeight: 2, valveLift: 3, valveDuration: 4, camBaseRadius: 5, idleRpm: 6, limitRpm: 7 } as const;
+export const P60_CONSTANT = { crankRadius: 0, rodLength: 1, compressionHeight: 2, valveLift: 3, valveDuration: 4, camBaseRadius: 5, idleRpm: 6, limitRpm: 7, tyreRadius: 8, shiftSeconds: 9, efficiency: 10 } as const;
 
 /** Where each value sits in a kinematics frame. Cylinder indexes are 0–7 for cylinders 1–8. */
 export const FRAME = {
@@ -36,6 +39,20 @@ export const FRAME = {
   exhaustPulse: (i: number) => 74 + i,
   length: 82,
 } as const;
+
+/** The gearbox behind the engine, from the crate (crates/p60/src/drivetrain.rs). */
+export function readGearbox(wasm: P60Exports): Gearbox {
+  const teeth = (id: number) => wasm.p60_gearbox(id);
+  return {
+    constantMesh: [teeth(0), teeth(1)],
+    gears: Array.from({ length: 6 }, (_, k) => [teeth(2 + 2 * k), teeth(3 + 2 * k)] as const),
+    finalDrive: [teeth(14), teeth(15)],
+    tyreRadius: wasm.p60_constant(P60_CONSTANT.tyreRadius),
+    shiftSeconds: wasm.p60_constant(P60_CONSTANT.shiftSeconds),
+    efficiency: wasm.p60_constant(P60_CONSTANT.efficiency),
+    limitRpm: wasm.p60_constant(P60_CONSTANT.limitRpm),
+  };
+}
 
 let bytes: Promise<ArrayBuffer> | null = null;
 
@@ -61,6 +78,8 @@ export async function instantiateP60(source: BufferSource): Promise<P60Exports> 
 /** Kinematics frames for the moving parts, computed by the crate. */
 export class Kinematics {
   readonly fireAngles: number[];
+  /** The gearbox behind the engine (drive/gears.ts). */
+  readonly gearbox: Gearbox;
   private readonly wasm: P60Exports;
   private view: Float32Array | null = null;
 
@@ -68,6 +87,7 @@ export class Kinematics {
     if (wasm.kin_len() !== FRAME.length) throw new Error(`p60.wasm frames hold ${wasm.kin_len()} values, not ${FRAME.length}`);
     this.wasm = wasm;
     this.fireAngles = Array.from({ length: 8 }, (_, i) => wasm.p60_fire_angle(i + 1));
+    this.gearbox = readGearbox(wasm);
   }
 
   /** The frame for a crank angle in degrees, at an engine load (0 to 1) and speed. The view is reused by the next call. */

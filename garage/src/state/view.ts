@@ -17,6 +17,9 @@ export const SHOWROOM: View = { kind: 'showroom' };
 
 export const isHoodOpen = (view: View): boolean => view.kind === 'bay' || view.kind === 'bay-part';
 
+/** The gearbox and drive view: the body turns to an x-ray around the driveline. */
+export const isDriveView = (view: View): boolean => view.kind === 'focus' && view.id === 'drivetrain';
+
 export function reduceView(view: View, action: ViewAction): View {
   switch (action.type) {
     case 'select-car':
