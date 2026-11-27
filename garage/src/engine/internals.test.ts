@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { Group, Mesh, MeshBasicMaterial, Vector3 } from 'three';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { cylinderLayout } from './geometry';
-import { poseInternals, prepareInternals } from './internals';
+import { poseInternals, prepareInternals, turnPump } from './internals';
 import { INTERNALS_NODES } from './manifest';
 import { FRAME, instantiateP60, Kinematics } from './p60';
 
@@ -26,12 +26,38 @@ function fakeInternals(): Group {
       part.position.set(0.1 * n, 0.2, cylinders[n - 1]!.center[2]);
       part.userData.axis = [0.6, 0.8, 0];
     }
+    if (name.startsWith('Springs_')) part.userData.length = 0.034;
+    if (name === 'Oil_pump') Object.assign(part.userData, { ratio: 0.5, lobes: [6, 7] });
     root.add(part);
   }
   return root;
 }
 
 describe('internals', () => {
+  it('compresses each pair of valve springs by its valves’ lift, and lets them stand again', () => {
+    const rig = prepareInternals(fakeInternals());
+    const springs = rig.root.getObjectByName('Springs_1_ex')!;
+    const crank = kinematics.fireAngles[0]! + 360 - 105; // peak exhaust lift for cylinder 1
+    poseInternals(rig, kinematics.frame(crank), true);
+    const lift = kinematics.frame(crank)[FRAME.exhaustLift(0)]!;
+    expect(lift).toBeGreaterThan(0.01);
+    expect(springs.scale.y).toBeCloseTo(1 - lift / 0.034, 6);
+    expect(springs.scale.x).toBe(1);
+    poseInternals(rig, kinematics.frame(kinematics.fireAngles[0]!), true);
+    expect(springs.scale.y).toBeCloseTo(1, 6);
+  });
+
+  it('turns the oil pump’s inner rotors at its ratio to the crank, and the outer rings six-sevenths as fast', () => {
+    const rig = prepareInternals(fakeInternals());
+    const inner = rig.root.getObjectByName('Oil_pump')!;
+    const outer = rig.root.getObjectByName('Oil_pump_outer')!;
+    turnPump(rig, 90);
+    expect(inner.rotation.z).toBeCloseTo((-90 * 0.5 * Math.PI) / 180, 6);
+    expect(outer.rotation.z).toBeCloseTo((inner.rotation.z * 6) / 7, 6);
+    for (let i = 0; i < 400; i++) turnPump(rig, 90);
+    expect(Math.abs(inner.rotation.z)).toBeLessThan(2 * Math.PI);
+  });
+
   it('poses every moving part from a kinematics frame', () => {
     const rig = prepareInternals(fakeInternals());
     const fire = kinematics.fireAngles[0]!;

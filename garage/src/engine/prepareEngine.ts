@@ -1,6 +1,6 @@
-import { AdditiveBlending, Color, DoubleSide, Mesh, MeshStandardMaterial, ShaderMaterial, type Material, type Object3D } from 'three';
+import { AdditiveBlending, Color, DoubleSide, Mesh, MeshStandardMaterial, ShaderMaterial, type Material, type Object3D, type Vector3 } from 'three';
 import type { EngineTopicId } from '../content/engine';
-import { ENGINE_NODES, ENGINE_PARTS, partNode } from './manifest';
+import { ENGINE_NODES, ENGINE_PARTS, partNode, SPIN_NODES } from './manifest';
 
 type PartId = (typeof ENGINE_PARTS)[number];
 export type EngineRig = {
@@ -11,6 +11,14 @@ export type EngineRig = {
   materials: Record<PartId, MeshStandardMaterial[]>;
   /** One x-ray material per part, so the selected part's can be brighter. */
   ghosts: Record<PartId, ShaderMaterial>;
+  /** The belt drive's pulleys, each with its speed relative to the crank. */
+  spins: { node: Object3D; ratio: number }[];
+  /** Throttle butterflies for cylinders 1–8, with the side of the engine each sits on (-1 right, 1 left). */
+  throttles: { node: Object3D; side: number }[];
+  /** Injector tips for cylinders 1–8, in engine space. */
+  injectors: Vector3[];
+  /** The stock tail pipes, which the game turbo kit's downpipes replace. */
+  tailpipes: Object3D[];
 };
 
 const HIGHLIGHT = new Color('#2f6bff');
@@ -72,7 +80,21 @@ export function prepareEngine(root: Object3D): EngineRig {
   });
 
   const ghosts = Object.fromEntries(ENGINE_PARTS.map((id) => [id, ghostMaterial()])) as Record<PartId, ShaderMaterial>;
-  const rig: EngineRig = { root, engine: root.getObjectByName('Engine')!, bay: root.getObjectByName('Bay')!, parts, materials, ghosts };
+  const named = (name: string) => root.getObjectByName(name)!;
+  const crankRadius = named('Spin_crank').userData.radius as number;
+  const cylinders = [1, 2, 3, 4, 5, 6, 7, 8];
+  const rig: EngineRig = {
+    root,
+    engine: named('Engine'),
+    bay: named('Bay'),
+    parts,
+    materials,
+    ghosts,
+    spins: SPIN_NODES.map((name) => ({ node: named(name), ratio: crankRadius / (named(name).userData.radius as number) })),
+    throttles: cylinders.map((n) => ({ node: named(`Throttle_${n}`), side: Math.sign(named(`Throttle_${n}`).position.x) })),
+    injectors: cylinders.map((n) => named(`Injector_${n}`).position.clone()),
+    tailpipes: ['Tailpipe_left', 'Tailpipe_right'].map(named),
+  };
   root.userData.rig = rig;
   return rig;
 }
@@ -91,7 +113,7 @@ const GHOST_EDGE = 0.32;
 const GHOST_SELECTED_EDGE = 0.9;
 
 /** A see-through x-ray: faint where a surface faces the camera, bright along its silhouette. Additive, so no sorting. */
-function ghostMaterial(): ShaderMaterial {
+export function ghostMaterial(): ShaderMaterial {
   return new ShaderMaterial({
     uniforms: { color: { value: new Color('#3d7bff') }, base: { value: 0.018 }, edge: { value: GHOST_EDGE } },
     vertexShader: `varying vec3 vNormal;

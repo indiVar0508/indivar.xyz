@@ -5,7 +5,7 @@ import { station } from '../music/station';
 import { audio } from './controller';
 import { bindAudio } from './bindings';
 
-vi.mock('./controller', () => ({ audio: { setEnabled: vi.fn(async () => undefined), sfx: vi.fn(), clearOwnTrack: vi.fn(), setRadioPlaying: vi.fn() } }));
+vi.mock('./controller', () => ({ audio: { setEnabled: vi.fn(async () => undefined), sfx: vi.fn(), clearOwnTrack: vi.fn(), setRadioPlaying: vi.fn(), setTurbo: vi.fn() } }));
 vi.mock('../music/station', () => ({ station: { pause: vi.fn() } }));
 
 let target: EventTarget;
@@ -92,7 +92,7 @@ describe('bindAudio with the engine', () => {
   beforeEach(() => {
     target = new EventTarget();
     Object.assign(globalThis, { window: target, localStorage: { getItem: () => 'off', setItem: () => undefined } });
-    useGarage.setState({ view: SHOWROOM, soundOn: true, engine: 'off' });
+    useGarage.setState({ view: SHOWROOM, soundOn: true, engine: 'off', turbo: false, gear: 0, driveNote: null });
     vi.clearAllMocks();
     bindAudio();
   });
@@ -102,9 +102,28 @@ describe('bindAudio with the engine', () => {
     expect(useGarage.getState().engine).toBe('running');
   });
 
+  it('fits and removes the game turbo kit in the engine sound', () => {
+    useGarage.getState().setTurbo(true);
+    expect(audio.setTurbo).toHaveBeenLastCalledWith(true);
+    useGarage.getState().setTurbo(false);
+    expect(audio.setTurbo).toHaveBeenLastCalledWith(false);
+  });
+
+  it('shows the gear the gearbox reports, and says why it refused a change until the next one', () => {
+    const events = audio as unknown as { onGear(gear: number): void; onShiftRefused(up: boolean): void };
+    events.onGear(3);
+    expect(useGarage.getState().gear).toBe(3);
+    events.onShiftRefused(false);
+    expect(useGarage.getState().driveNote).toBe('Too fast for 2nd: it would over-rev the engine.');
+    events.onGear(4);
+    expect(useGarage.getState().driveNote).toBeNull();
+  });
+
   it('stops the engine when sound is turned off', () => {
     useGarage.getState().setEngine('running');
+    useGarage.getState().setGear(2);
     useGarage.getState().setSound(false);
+    expect(useGarage.getState().gear).toBe(0);
     expect(useGarage.getState().engine).toBe('off');
     expect(audio.setEnabled).toHaveBeenCalledWith(false);
   });

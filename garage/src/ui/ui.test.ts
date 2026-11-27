@@ -30,6 +30,7 @@ describe('topicFor and breadcrumbFor', () => {
     expect(topicFor({ kind: 'bay-part', id: 'crank' })?.title).toBe('Flat-plane crankshaft');
     expect(breadcrumbFor({ kind: 'bay-part', id: 'crank' })).toEqual(['Garage', 'Engine bay', 'Flat-plane crankshaft']);
     expect(breadcrumbFor({ kind: 'focus', id: 'wheels' })).toEqual(['Garage', 'Wheels and brakes']);
+    expect(breadcrumbFor({ kind: 'focus', id: 'drivetrain' })).toEqual(['Garage', 'Gearbox and drive']);
   });
 
   it('explains how the engine runs when looking inside from the bay, and keeps part topics as they are', () => {
@@ -47,6 +48,14 @@ describe('carHotspot', () => {
       expect(Math.hypot(...normal), id).toBeGreaterThan(0.5);
       expect(position[1], id).toBeGreaterThan(0.1);
     }
+  });
+
+  it('puts the drivetrain hotspot low on the left side, between the doors and the rear wheel', () => {
+    const { position } = carHotspot('drivetrain', anchors);
+    expect(position[0]).toBeGreaterThan(0.9);
+    expect(position[1]).toBeLessThan(0.4);
+    expect(position[2]).toBeLessThan(0);
+    expect(position[2]).toBeGreaterThan(anchors.wheelRL[2] + 0.4);
   });
 
   it('puts the wheel hotspot just outside the front-left tyre', () => {

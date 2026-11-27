@@ -14,7 +14,20 @@ const DEFAULT_TOLERANCE = 0.06;
 const TOPICS = Object.keys(ENGINE_ANCHORS) as EngineTopicId[];
 export const ENGINE_PARTS: EngineTopicId[] = TOPICS.filter((id) => !(id in ANCHOR_PART));
 export const partNode = (id: EngineTopicId): string => `Part_${id}`;
-export const ENGINE_NODES: string[] = ['Engine', 'Bay', ...ENGINE_PARTS.map(partNode)];
+const CYLINDER_NUMBERS = [1, 2, 3, 4, 5, 6, 7, 8] as const;
+/** The belt drive's pulleys, each a pivot the page spins at its belt ratio (extras.radius). */
+export const SPIN_NODES = ['Spin_crank', 'Spin_tensioner', 'Spin_alternator', 'Spin_water_pump', 'Spin_idler'] as const;
+export const ENGINE_NODES: string[] = [
+  'Engine',
+  'Bay',
+  ...ENGINE_PARTS.map(partNode),
+  ...SPIN_NODES,
+  ...CYLINDER_NUMBERS.map((n) => `Throttle_${n}`),
+  ...CYLINDER_NUMBERS.map((n) => `Injector_${n}`),
+  ...CYLINDER_NUMBERS.map((n) => `Flow_exhaust_${n}`),
+  'Tailpipe_left',
+  'Tailpipe_right',
+];
 
 export const ENGINE_BUDGET = { maxBytes: 4 * 1024 * 1024, maxTriangles: 90_000 } as const;
 
@@ -25,6 +38,12 @@ export type EngineAssetFacts = {
   textureMimeTypes: string[];
   /** Bounds of each Part_* node in engine space (relative to the Engine node). */
   partBounds: Record<string, Box>;
+  /** Spin_* and Throttle_* nodes that carry a mesh themselves instead of holding it as a child. */
+  pivotsWithMeshes: string[];
+  /** Each Spin_* node's extras.radius. */
+  spinRadii: Record<string, unknown>;
+  /** Each Flow_* node's extras.points. */
+  flows: Record<string, unknown>;
 };
 
 /** Distance from a point to a box; zero inside it. */
@@ -47,6 +66,18 @@ export function engineAssetErrors(facts: EngineAssetFacts): string[] {
     const distance = distanceToBox(ENGINE_ANCHORS[id].position, bounds);
     if (distance > (ANCHOR_TOLERANCE[id] ?? DEFAULT_TOLERANCE)) errors.push(`the ${id} hotspot is ${distance.toFixed(2)} m from ${node}`);
   }
+  // Mesh quantization folds a scale and offset into the node that holds a mesh, which would move a pivot.
+  for (const name of facts.pivotsWithMeshes) errors.push(`${name} holds its mesh directly; quantization would move its pivot`);
+  for (const name of SPIN_NODES.filter((n) => have.has(n))) {
+    const radius = facts.spinRadii[name];
+    if (typeof radius !== 'number' || !(radius > 0)) errors.push(`${name} has no pulley radius in its extras`);
+  }
+  for (const name of facts.nodeNames.filter((n) => n.startsWith('Flow_'))) {
+    const points = facts.flows[name];
+    if (!Array.isArray(points) || points.length < 6 || points.length % 3 !== 0 || !points.every((v) => typeof v === 'number')) {
+      errors.push(`${name} needs two or more points (x, y, z, ...)`);
+    }
+  }
   return errors;
 }
 
@@ -55,6 +86,9 @@ export function engineAssetErrors(facts: EngineAssetFacts): string[] {
 const CYLINDERS = [1, 2, 3, 4, 5, 6, 7, 8] as const;
 export const CAM_NODES = ['Cam_right_in', 'Cam_right_ex', 'Cam_left_in', 'Cam_left_ex'] as const;
 export const valveNode = (cylinder: number, exhaust: boolean): string => `Valve_${cylinder}_${exhaust ? 'ex' : 'in'}`;
+/** A valve pair's springs: a pivot on the spring seat, along the stem, that the page compresses by the lift. */
+export const springNode = (cylinder: number, exhaust: boolean): string => `Springs_${cylinder}_${exhaust ? 'ex' : 'in'}`;
+export const CHAIN_FLOWS = ['Flow_chain_right', 'Flow_chain_left'] as const;
 export const INTERNALS_NODES: string[] = [
   'Internals',
   'Crank',
@@ -62,8 +96,14 @@ export const INTERNALS_NODES: string[] = [
   ...CYLINDERS.map((n) => `Piston_${n}`),
   ...CAM_NODES,
   ...CYLINDERS.flatMap((n) => [valveNode(n, false), valveNode(n, true)]),
+  'Starter_pinion',
+  'Plugs',
+  ...CYLINDERS.flatMap((n) => [springNode(n, false), springNode(n, true)]),
+  'Oil_pump',
+  'Oil_pump_outer',
+  ...CHAIN_FLOWS,
 ];
-export const INTERNALS_BUDGET = { maxBytes: 1024 * 1024, maxTriangles: 40_000 } as const;
+export const INTERNALS_BUDGET = { maxBytes: 1024 * 1024, maxTriangles: 60_000 } as const;
 
 export type InternalsAssetFacts = {
   nodeNames: string[];
@@ -73,7 +113,13 @@ export type InternalsAssetFacts = {
   valveAxes: Record<string, unknown>;
   /** Moving-part nodes that carry a mesh themselves instead of holding it as a child. */
   pivotsWithMeshes: string[];
+  /** Each Springs_* node's extras.length: how long the springs stand with the valves shut (m). */
+  springLengths: Record<string, unknown>;
+  /** Each timing chain's path, from its extras.points. */
+  flows: Record<string, unknown>;
 };
+
+const isPath = (points: unknown): boolean => Array.isArray(points) && points.length >= 6 && points.length % 3 === 0;
 
 const isUnit = (axis: unknown): boolean =>
   Array.isArray(axis) && axis.length === 3 && axis.every((v) => typeof v === 'number') && Math.abs(Math.hypot(...(axis as number[])) - 1) < 1e-3;
@@ -86,7 +132,40 @@ export function internalsAssetErrors(facts: InternalsAssetFacts): string[] {
   for (const name of INTERNALS_NODES.filter((n) => n.startsWith('Valve_') && have.has(n))) {
     if (!isUnit(facts.valveAxes[name])) errors.push(`${name} has no unit stem axis in its extras`);
   }
+  for (const name of INTERNALS_NODES.filter((n) => n.startsWith('Springs_') && have.has(n))) {
+    const length = facts.springLengths[name];
+    if (typeof length !== 'number' || length <= 0) errors.push(`${name} has no length in its extras`);
+  }
+  for (const name of CHAIN_FLOWS) if (have.has(name) && !isPath(facts.flows[name])) errors.push(`${name} needs two or more points (x, y, z, ...)`);
   // Mesh quantization folds a scale and offset into the node that holds a mesh, which would move a pivot.
   for (const name of facts.pivotsWithMeshes) errors.push(`${name} holds its mesh directly; quantization would move its pivot`);
+  return errors;
+}
+
+// The game turbo kit (spec 2026-10-18 §2), in its own file. The real P60B40 is naturally aspirated.
+
+export const TURBO_NODES: string[] = [
+  'Turbo',
+  'Compressor_left',
+  'Compressor_right',
+  'Flow_charge_left',
+  'Flow_charge_right',
+  'Flow_exhaust_turbo_left',
+  'Flow_exhaust_turbo_right',
+];
+export const TURBO_BUDGET = { maxBytes: 1024 * 1024, maxTriangles: 30_000 } as const;
+
+export type TurboAssetFacts = { nodeNames: string[]; bytes: number; triangles: number; pivotsWithMeshes: string[]; flows: Record<string, unknown> };
+
+export function turboAssetErrors(facts: TurboAssetFacts): string[] {
+  const have = new Set(facts.nodeNames);
+  const errors = TURBO_NODES.filter((name) => !have.has(name)).map((name) => `missing node: ${name}`);
+  if (facts.bytes > TURBO_BUDGET.maxBytes) errors.push(`file is ${(facts.bytes / 1048576).toFixed(1)} MB; budget is 1 MB`);
+  if (facts.triangles > TURBO_BUDGET.maxTriangles) errors.push(`${facts.triangles} triangles; budget is ${TURBO_BUDGET.maxTriangles}`);
+  for (const name of facts.pivotsWithMeshes) errors.push(`${name} holds its mesh directly; quantization would move its pivot`);
+  for (const name of facts.nodeNames.filter((n) => n.startsWith('Flow_'))) {
+    const points = facts.flows[name];
+    if (!Array.isArray(points) || points.length < 6 || points.length % 3 !== 0) errors.push(`${name} needs two or more points (x, y, z, ...)`);
+  }
   return errors;
 }

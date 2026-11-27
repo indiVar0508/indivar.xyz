@@ -3,7 +3,7 @@ import { useGarage } from './store';
 import { SHOWROOM } from './view';
 
 describe('useGarage', () => {
-  beforeEach(() => useGarage.setState({ view: SHOWROOM, quality: 'high', ready: false, soundOn: false, ownTrack: null, trackError: null, inside: false }));
+  beforeEach(() => useGarage.setState({ view: SHOWROOM, quality: 'high', ready: false, soundOn: false, ownTrack: null, trackError: null, inside: false, turbo: false }));
 
   it('routes view actions through the reducer', () => {
     useGarage.getState().dispatch({ type: 'select-car', id: 'hood' });
@@ -28,6 +28,12 @@ describe('useGarage', () => {
     expect(useGarage.getState().inside).toBe(true);
     s.dispatch({ type: 'close-hood' });
     expect(useGarage.getState().inside).toBe(false);
+  });
+
+  it('fits the game turbo kit only when asked, and starts every visit without it', () => {
+    expect(useGarage.getState().turbo).toBe(false);
+    useGarage.getState().setTurbo(true);
+    expect(useGarage.getState().turbo).toBe(true);
   });
 
   it('stores settings', () => {

@@ -54,6 +54,40 @@ describe('p60-worklet.js', () => {
     expect(last().rpm).toBeGreaterThan(7000);
   });
 
+  it('fits the game turbo kit on command and reports boost and load', () => {
+    const processor = loadProcessor();
+    processor.port.onmessage!({ data: { type: 'turbo', value: true } });
+    processor.port.onmessage!({ data: { type: 'start' } });
+    render(processor, 3);
+    processor.port.onmessage!({ data: { type: 'throttle', value: 1 } });
+    render(processor, 2);
+    const last = processor.port.posted.at(-1) as { load: number; boost: number };
+    expect(last.load).toBeCloseTo(1, 1);
+    expect(last.boost).toBeGreaterThan(0.6);
+  });
+
+  it('changes gear on command, reports the gear and the wheels turning, and says when it refuses a change', () => {
+    type Report = { rpm: number; status: number; gear: number; wheel: number; clutch: number; refused?: boolean };
+    const processor = loadProcessor();
+    const last = () => processor.port.posted.at(-1) as Report;
+    processor.port.onmessage!({ data: { type: 'start' } });
+    render(processor, 3);
+    processor.port.onmessage!({ data: { type: 'shift', value: false } });
+    expect(last()).toMatchObject({ refused: true, gear: 0 });
+    processor.port.onmessage!({ data: { type: 'shift', value: true } });
+    processor.port.onmessage!({ data: { type: 'throttle', value: 1 } });
+    render(processor, 2);
+    expect(last().gear).toBe(1);
+    expect(last().wheel).toBeGreaterThan(20);
+    expect(last().clutch).toBeGreaterThan(0);
+    processor.port.onmessage!({ data: { type: 'stop' } });
+    render(processor, 4);
+    const reports = processor.port.posted as Report[];
+    // The reports carry on while the rollers brake to a stop after the engine, and end with them still.
+    expect(reports.some((report) => report.status === 0 && report.wheel > 0)).toBe(true);
+    expect(last()).toMatchObject({ status: 0, wheel: 0 });
+  });
+
   it('renders a render quantum larger than the crate block in pieces', () => {
     const processor = loadProcessor();
     processor.port.onmessage!({ data: { type: 'start' } });

@@ -52,6 +52,18 @@ describe('p60.wasm', () => {
     expect(frame[FRAME.cam]).toBeCloseTo(-Math.PI / 4, 6);
   });
 
+  it('sparks before each cylinder fires, sprays fuel before its intake opens, and sends exhaust down its header', () => {
+    kinematics.fireAngles.forEach((angle, i) => {
+      expect(kinematics.frame(angle - 8, 0, 1500)[FRAME.spark(i)]).toBeGreaterThan(0); // 12° advance at idle, a 10° flash
+      expect(kinematics.frame(angle + 10, 0, 1500)[FRAME.spark(i)]).toBe(0);
+      const intakeOpens = wasm.p60_valve_centre(i + 1, 0) - wasm.p60_constant(P60_CONSTANT.valveDuration) / 2;
+      expect(kinematics.frame(intakeOpens - 20, 0.5, 3000)[FRAME.injection(i)]).toBeGreaterThan(0);
+      expect(kinematics.frame(angle + 60, 1, 3000)[FRAME.injection(i)]).toBe(0);
+      expect(kinematics.frame(angle, 0, 0)[FRAME.exhaustPulse(i)]).toBe(-1);
+      expect(kinematics.frame(angle + 200, 0, 0)[FRAME.exhaustPulse(i)]).toBeGreaterThan(0);
+    });
+  });
+
   it('answers out-of-range cylinders with NaN instead of trapping', () => {
     expect(wasm.p60_fire_angle(0)).toBeNaN();
     expect(wasm.p60_fire_angle(9)).toBeNaN();

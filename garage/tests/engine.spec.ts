@@ -98,7 +98,7 @@ test('keeps the engine controls clear of the radio player and the panel', async 
   await page.getByRole('button', { name: 'Most Wanted radio' }).click();
   await page.getByRole('button', { name: 'Start engine' }).click();
   await expect(page.getByRole('button', { name: 'Hold to rev' })).toBeVisible({ timeout: 20_000 });
-  const controls = [page.locator('.tach'), ...['Stop engine', 'Hold to rev', 'Look inside'].map((name) => page.getByRole('button', { name }))];
+  const controls = [page.locator('.tach'), page.locator('.gear-readout'), ...['Stop engine', 'Hold to rev', 'Shift down', 'Shift up', 'Look inside'].map((name) => page.getByRole('button', { name }))];
   for (const control of controls) {
     const box = (await control.boundingBox())!;
     for (const selector of ['.radio-player', '.panel']) {
@@ -113,5 +113,84 @@ test('keeps the engine controls clear of the radio player and the panel', async 
     const hit = await page.evaluate(([x, y]) => document.elementFromPoint(x!, y!)?.closest('button')?.textContent ?? null, [box.x + box.width / 2, box.y + box.height / 2]);
     expect(hit, name).toContain(name === 'Hold to rev' ? 'Hold to rev' : name);
   }
+  expect(errors).toEqual([]);
+});
+
+const probe = (page: Page, name: string) => page.evaluate((n) => (window as unknown as Record<string, (() => unknown) | undefined>)[n]?.() ?? null, name);
+
+test('turns the belt drive and shows fuel, spark, air, exhaust, oil and coolant inside', async ({ page }, info) => {
+  const errors = await open(page);
+  await page.getByRole('button', { name: 'Open the hood' }).click();
+  await page.getByRole('button', { name: 'Start engine' }).click();
+  await expect.poll(() => state(page, 'engine'), { timeout: 20_000 }).toBe('running');
+  const belt = (await probe(page, 'garageBelt')) as number[];
+  await page.waitForTimeout(300);
+  const later = (await probe(page, 'garageBelt')) as number[];
+  later.forEach((angle, i) => expect(angle, `pulley ${i}`).not.toBe(belt[i]));
+  await page.getByRole('button', { name: 'Look inside' }).click();
+  await expect.poll(() => probe(page, 'garageFlows'), { timeout: 30_000 }).toBeGreaterThan(30);
+  await page.waitForTimeout(1500);
+  await page.screenshot({ path: info.outputPath('inside-flows.png') });
+  expect(errors).toEqual([]);
+});
+
+test('fits the game turbo kit: labelled, spooling with revs, and off again', async ({ page }, info) => {
+  const errors = await open(page);
+  await page.getByRole('button', { name: 'Open the hood' }).click();
+  await page.getByRole('button', { name: 'Game turbo' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'only in Most Wanted' })).toBeVisible();
+  await expect.poll(() => probe(page, 'garageTurbo'), { timeout: 30_000 }).not.toBeNull();
+  await page.getByRole('button', { name: 'Start engine' }).click();
+  await expect.poll(() => state(page, 'engine'), { timeout: 20_000 }).toBe('running');
+  await hold(page, 'Hold to rev', 1500);
+  const boost = await page.evaluate(() => (window as unknown as { garageEngine: { boost: number } }).garageEngine.boost);
+  expect(boost).toBeGreaterThan(0.4);
+  await page.screenshot({ path: info.outputPath('turbo.png') });
+  await page.mouse.up();
+  await page.getByRole('button', { name: 'Look inside' }).click();
+  await page.waitForTimeout(1500);
+  await page.screenshot({ path: info.outputPath('turbo-inside.png') });
+  await page.getByRole('button', { name: 'Game turbo' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'only in Most Wanted' })).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+type DriveWindow = { garageDrive(): { wheels: number[]; rollers: number[]; dogs: number[]; driveline: boolean } };
+const drive = (page: Page) => page.evaluate(() => (window as unknown as DriveWindow).garageDrive());
+const live = (page: Page, key: string) => page.evaluate((k) => (window as unknown as { garageEngine: Record<string, number> }).garageEngine[k]!, key);
+
+test('changes gear and drives the rear wheels on the rollers, and shows the driveline through the body', async ({ page }, info) => {
+  const errors = await open(page);
+  await page.getByRole('button', { name: 'Start engine' }).click();
+  await expect(page.getByRole('button', { name: 'Shift up' })).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator('.gear-now')).toHaveText('N');
+  await page.keyboard.press('ArrowUp');
+  await expect.poll(() => state(page, 'gear'), { timeout: 5_000 }).toBe(1);
+  await expect(page.locator('.gear-now')).toHaveText('1');
+
+  const before = await drive(page);
+  await page.keyboard.down('r');
+  await expect.poll(() => live(page, 'wheel'), { timeout: 10_000 }).toBeGreaterThan(20);
+  await page.keyboard.up('r');
+  const after = await drive(page);
+  expect(after.wheels[0]).not.toBe(before.wheels[0]);
+  expect(after.rollers[0]).not.toBe(before.rollers[0]);
+  await expect(page.locator('.gear-speed')).not.toHaveText('0 km/h');
+
+  await page.evaluate(() => (window as unknown as { garage: { getState(): { dispatch(action: object): void } } }).garage.getState().dispatch({ type: 'select-car', id: 'drivetrain' }));
+  await expect(page.locator('.panel')).toContainText('Gearbox and drive');
+  await expect(page.locator('.gears li')).toHaveCount(6);
+  await expect(page.locator('.gears li.is-engaged .gear-number')).toHaveText('1');
+  await expect.poll(async () => (await drive(page)).driveline).toBe(true);
+  await expect.poll(async () => (await drive(page)).dogs[0]!, { timeout: 5_000 }).toBeLessThan(-0.008); // 1-2's ring slid to 1st
+  await page.waitForTimeout(1500);
+  await page.screenshot({ path: info.outputPath('drivetrain.png') });
+
+  for (let gear = 2; gear <= 7; gear++) {
+    await page.waitForTimeout(250);
+    await page.getByRole('button', { name: 'Shift up' }).click();
+  }
+  await expect.poll(() => state(page, 'gear'), { timeout: 5_000 }).toBe(6);
+  await expect(page.locator('.engine-note')).toHaveText('6th is the top gear.');
   expect(errors).toEqual([]);
 });

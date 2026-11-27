@@ -1,5 +1,6 @@
 // The P60B40's sound, on the audio thread. The page passes in p60.wasm's bytes and sends commands; each block is
-// rendered into wasm memory and copied out, and engine speed is reported back about 45 times a second.
+// rendered into wasm memory and copied out. Engine speed, load, boost, the gear, the wheels' speed on the rollers and
+// the clutch's torque are reported back about 45 times a second, while anything turns.
 // Plain JavaScript: an AudioWorklet module is loaded by URL, outside the app's bundle.
 
 const REPORT_EVERY = 8; // blocks of 128 frames
@@ -8,6 +9,11 @@ const COMMANDS = {
   stop: (wasm) => wasm.synth_stop(),
   reset: (wasm) => wasm.synth_reset(),
   throttle: (wasm, value) => wasm.synth_set_throttle(value),
+  turbo: (wasm, value) => wasm.synth_set_turbo(value ? 1 : 0),
+  // A refused change is reported at once, so the page can say why.
+  shift: (wasm, up, processor) => {
+    if (!wasm.synth_shift(up ? 1 : 0)) processor.report({ refused: true });
+  },
 };
 
 class P60Processor extends AudioWorkletProcessor {
@@ -19,8 +25,24 @@ class P60Processor extends AudioWorkletProcessor {
     this.stride = this.wasm.synth_max_frames();
     this.heap = new Float32Array(this.wasm.memory.buffer);
     this.status = 0;
+    this.gear = 0;
+    this.turning = false;
     this.blocks = 0;
-    this.port.onmessage = ({ data }) => COMMANDS[data.type]?.(this.wasm, data.value);
+    this.port.onmessage = ({ data }) => COMMANDS[data.type]?.(this.wasm, data.value, this);
+  }
+
+  report(extra) {
+    const wasm = this.wasm;
+    this.port.postMessage({
+      rpm: wasm.synth_rpm(),
+      load: wasm.synth_load(),
+      boost: wasm.synth_boost(),
+      status: this.status,
+      gear: this.gear,
+      wheel: wasm.synth_wheel(),
+      clutch: wasm.synth_clutch(),
+      ...extra,
+    });
   }
 
   process(_inputs, outputs) {
@@ -34,9 +56,14 @@ class P60Processor extends AudioWorkletProcessor {
       done += frames;
     }
     const status = this.wasm.synth_status();
-    if (status !== this.status || (status !== 0 && ++this.blocks % REPORT_EVERY === 0)) {
+    const gear = this.wasm.synth_gear();
+    // Keep reporting until the engine and the rollers have both stopped, and once more after.
+    const turning = status !== 0 || this.wasm.synth_wheel() > 0;
+    if (status !== this.status || gear !== this.gear || turning !== this.turning || (turning && ++this.blocks % REPORT_EVERY === 0)) {
       this.status = status;
-      this.port.postMessage({ rpm: this.wasm.synth_rpm(), status });
+      this.gear = gear;
+      this.turning = turning;
+      this.report();
     }
     return true;
   }

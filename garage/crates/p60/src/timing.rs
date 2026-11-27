@@ -97,6 +97,46 @@ pub fn glow(cyl: usize, crank: f32) -> f32 {
     }
 }
 
+/// Illustrative: spark advance before top dead centre, growing with rpm (degrees).
+pub fn spark_advance(rpm: f32) -> f32 {
+    12.0 + 18.0 * ((rpm - 1500.0) / 6000.0).clamp(0.0, 1.0)
+}
+
+/// Brightness of the spark at the plug: a short flash, `spark_advance` degrees before the cylinder fires.
+pub fn spark(cyl: usize, crank: f32, rpm: f32) -> f32 {
+    let d = wrap720(crank - (fire_angle(cyl) - spark_advance(rpm)));
+    if d < 10.0 {
+        1.0 - d / 10.0
+    } else {
+        0.0
+    }
+}
+
+/// Illustrative port injection: the injector sprays at the back of the shut intake valve and stops just after it
+/// opens. More load means a longer spray. Returns 0 to 1, with short ramps at each end.
+pub fn injection(cyl: usize, crank: f32, load: f32) -> f32 {
+    let (opens, _) = valve_events(cyl, false);
+    let duration = 40.0 + 160.0 * load.clamp(0.0, 1.0);
+    let into = wrap720(crank - (opens + 10.0 - duration));
+    if into >= duration {
+        return 0.0;
+    }
+    (into / 5.0).min((duration - into) / 5.0).min(1.0)
+}
+
+/// Crank degrees the exhaust pulse takes to run the length of its header primary.
+pub const EXHAUST_TRAVEL: f32 = 220.0;
+
+/// How far down its header a cylinder's exhaust pulse has run (0 to 1), or -1 when none is in the pipe.
+pub fn exhaust_pulse(cyl: usize, crank: f32) -> f32 {
+    let d = wrap720(crank - valve_events(cyl, true).0);
+    if d < EXHAUST_TRAVEL {
+        d / EXHAUST_TRAVEL
+    } else {
+        -1.0
+    }
+}
+
 pub struct Throw {
     /// Pin centre (x, y).
     pub pin: [f32; 2],
@@ -120,10 +160,11 @@ pub fn throw(cyl: usize, crank: f32) -> Throw {
 }
 
 /// Floats per kinematics frame: crank and cam rotation, then (piston, pin x, pin y, rod angle) per cylinder,
-/// then (intake lift, exhaust lift) per cylinder, then a glow per cylinder.
-pub const KIN_LEN: usize = 2 + CYLINDERS * 4 + CYLINDERS * 2 + CYLINDERS;
+/// then (intake lift, exhaust lift) per cylinder, then per cylinder: glow, spark, injection, exhaust pulse.
+pub const KIN_LEN: usize = 2 + CYLINDERS * 4 + CYLINDERS * 2 + CYLINDERS * 4;
 
-pub fn kinematics(crank: f32, out: &mut [f32; KIN_LEN]) {
+/// The frame for a crank angle. `load` (0 to 1) sets how long the injectors spray; `rpm` sets the spark advance.
+pub fn kinematics(crank: f32, load: f32, rpm: f32, out: &mut [f32; KIN_LEN]) {
     out[0] = -crank.to_radians(); // clockwise from the front is negative about +z
     out[1] = -(crank / 2.0).to_radians(); // cams turn once per cycle, the same way
     for i in 0..CYLINDERS {
@@ -133,6 +174,9 @@ pub fn kinematics(crank: f32, out: &mut [f32; KIN_LEN]) {
         out[34 + i * 2] = valve_lift(crank, valve_centre(cyl, false));
         out[35 + i * 2] = valve_lift(crank, valve_centre(cyl, true));
         out[50 + i] = glow(cyl, crank);
+        out[58 + i] = spark(cyl, crank, rpm);
+        out[66 + i] = injection(cyl, crank, load);
+        out[74 + i] = exhaust_pulse(cyl, crank);
     }
 }
 
@@ -208,9 +252,42 @@ mod tests {
     }
 
     #[test]
+    fn sparks_before_firing_and_earlier_at_high_rpm() {
+        for cyl in 1..=8 {
+            let fire = fire_angle(cyl);
+            assert_eq!(spark(cyl, fire - spark_advance(1500.0), 1500.0), 1.0);
+            assert_eq!(spark(cyl, fire + 5.0, 1500.0), 0.0);
+            assert!(spark(cyl, fire - 27.0, 8000.0) > 0.5, "lit 27° early at 8,000 rpm");
+            assert_eq!(spark(cyl, fire - 27.0, 1500.0), 0.0, "not yet at idle");
+        }
+        assert!(spark_advance(8000.0) > spark_advance(1500.0));
+    }
+
+    #[test]
+    fn injects_against_the_shut_intake_valve_for_longer_under_load() {
+        let open_for = |cyl: usize, load: f32| (0..720).filter(|&a| injection(cyl, a as f32, load) > 0.0).count();
+        for cyl in 1..=8 {
+            assert!(open_for(cyl, 1.0) > 2 * open_for(cyl, 0.0));
+            let (opens, _) = valve_events(cyl, false);
+            assert!(injection(cyl, opens - 20.0, 0.0) > 0.0, "sprays before the valve opens");
+            assert_eq!(injection(cyl, opens + 30.0, 1.0), 0.0, "and stops once it is open");
+            assert_eq!(injection(cyl, fire_angle(cyl) + 40.0, 1.0), 0.0, "never in the power stroke");
+        }
+    }
+
+    #[test]
+    fn sends_each_exhaust_pulse_down_its_header_after_the_valve_opens() {
+        for cyl in 1..=8 {
+            let (opens, _) = valve_events(cyl, true);
+            assert_eq!(exhaust_pulse(cyl, opens - 1.0), -1.0);
+            assert!((exhaust_pulse(cyl, opens + EXHAUST_TRAVEL / 2.0) - 0.5).abs() < 1e-4);
+        }
+    }
+
+    #[test]
     fn kinematics_frame_matches_the_parts() {
         let mut out = [0.0; KIN_LEN];
-        kinematics(90.0, &mut out);
+        kinematics(90.0, 0.0, 1500.0, &mut out);
         assert!((out[0] + 90f32.to_radians()).abs() < 1e-6);
         assert!((out[1] + 45f32.to_radians()).abs() < 1e-6);
         let eight = 2 + 7 * 4;

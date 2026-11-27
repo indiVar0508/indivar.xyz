@@ -7,6 +7,7 @@ import json
 import math
 import sys
 
+import bmesh
 import bpy
 from mathutils import Matrix, Vector
 
@@ -58,6 +59,43 @@ def empty(name, location, parent=None):
         obj.parent = parent
         obj.matrix_parent_inverse = parent.matrix_world.inverted()
     return obj
+
+
+def split_off(obj, keep, name):
+    """Moves the loose parts of `obj` whose centre passes `keep` into a new object called `name`, and returns it."""
+    bm = bmesh.new()
+    bm.from_mesh(obj.data)
+    bm.verts.ensure_lookup_table()
+    root = list(range(len(bm.verts)))
+
+    def find(i):
+        while root[i] != i:
+            root[i] = root[root[i]]
+            i = root[i]
+        return i
+
+    for edge in bm.edges:
+        root[find(edge.verts[0].index)] = find(edge.verts[1].index)
+    sums = {}
+    for vertex in bm.verts:
+        total = sums.setdefault(find(vertex.index), [Vector(), 0])
+        total[0] += vertex.co
+        total[1] += 1
+    inside = {r for r, (total, n) in sums.items() if keep(total / n)}
+    part = bm.copy()  # same vertex order, so the parts found above still apply
+    part_faces = [face for face in part.faces if find(face.verts[0].index) not in inside]
+    rest_faces = [face for face in bm.faces if find(face.verts[0].index) in inside]
+    bmesh.ops.delete(part, geom=part_faces, context="FACES")
+    bmesh.ops.delete(bm, geom=rest_faces, context="FACES")
+    taken = obj.copy()
+    taken.data = obj.data.copy()
+    taken.name = name
+    bpy.context.scene.collection.objects.link(taken)
+    part.to_mesh(taken.data)
+    bm.to_mesh(obj.data)
+    part.free()
+    bm.free()
+    return taken
 
 
 def main():
@@ -117,6 +155,17 @@ def main():
     engine_bay = Vector((0.0, (panel_lo.y + panel_hi.y) / 2, wheels["FL"].z))
     final_lo, final_hi = bounds(meshes)
 
+    # The driven wheels turn on the rolling road: split each one's tyre, rim and brake disc out of the shared meshes.
+    # The calipers stay on the body.
+    spinning = {}
+    for label in cfg["drivenWheels"]:
+        centre = wheels[label]
+
+        def near(point, centre=centre):
+            return abs(point.x - centre.x) < 0.25 and math.hypot(point.y - centre.y, point.z - centre.z) < 0.4
+
+        spinning[label] = [split_off(by_key[key], near, f"{cfg['rename'][key]}_{label}") for key in cfg["wheelParts"]]
+
     # 5. Hierarchy: Hood pivots on the hinge; everything else sits under Body; markers at the root.
     hood = empty("Hood", hinge)
     body = empty("Body", Vector((0.0, 0.0, 0.0)))
@@ -126,6 +175,12 @@ def main():
         parent = hood if obj.name in hood_meshes else body
         obj.parent = parent
         obj.matrix_parent_inverse = parent.matrix_world.inverted()
+    for label, parts in spinning.items():
+        pivot = empty(f"Wheel_{label}", wheels[label], body)  # turns about x, the axle
+        bpy.context.view_layer.update()
+        for obj in parts:
+            obj.parent = pivot
+            obj.matrix_parent_inverse = pivot.matrix_world.inverted()
     for label, centre in wheels.items():
         empty(f"Marker_Wheel_{label}", centre)
     empty("Marker_EngineBay", engine_bay)
@@ -141,7 +196,8 @@ def main():
         export_image_format="AUTO",
     )
 
-    triangles = sum(sum(len(p.vertices) - 2 for p in o.data.polygons) for o in meshes)
+    every_mesh = meshes + [obj for parts in spinning.values() for obj in parts]
+    triangles = sum(sum(len(p.vertices) - 2 for p in o.data.polygons) for o in every_mesh)
     report = {
         "scale": round(factor, 4),
         "boundsMin": to_car_space(Vector((final_lo.x, final_hi.y, final_lo.z))),

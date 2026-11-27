@@ -1,6 +1,6 @@
 import { AdditiveBlending, Color, Mesh, MeshBasicMaterial, SphereGeometry, Vector3, type Object3D } from 'three';
 import { cylinderLayout } from './geometry';
-import { CAM_NODES, INTERNALS_NODES, valveNode } from './manifest';
+import { CAM_NODES, INTERNALS_NODES, springNode, valveNode } from './manifest';
 import { FRAME } from './p60';
 
 /** How far up the bore the combustion flash sits: between the crown at top dead centre and the valves. */
@@ -8,7 +8,7 @@ const FLAME_HEIGHT = 0.244;
 /** Brighter than white, so the bloom pass catches it. */
 const FLAME = new Color(8, 2.6, 0.5);
 
-type Valve = { node: Object3D; rest: Vector3; axis: Vector3; cylinder: number; exhaust: boolean };
+type Valve = { node: Object3D; rest: Vector3; axis: Vector3; cylinder: number; exhaust: boolean; springs: Object3D; springLength: number };
 
 export type InternalsRig = {
   root: Object3D;
@@ -20,6 +20,8 @@ export type InternalsRig = {
   flames: Mesh<SphereGeometry, MeshBasicMaterial>[];
   /** Each cylinder's bore direction. */
   bores: Vector3[];
+  /** The dry-sump pump's inner rotors and outer rings, its turns per crank turn, and the outer ring's share of that. */
+  pump: { inner: Object3D; outer: Object3D; ratio: number; follow: number };
 };
 
 /** Checks the moving parts' file and readies it to be posed. Mutates `root` once. */
@@ -51,7 +53,9 @@ export function prepareInternals(root: Object3D): InternalsRig {
   const valves = cylinders.flatMap(({ number }) =>
     [false, true].map((exhaust) => {
       const node = named(valveNode(number, exhaust))!;
-      return { node, rest: node.position.clone(), axis: new Vector3(...(node.userData.axis as [number, number, number])), cylinder: number - 1, exhaust };
+      const springs = named(springNode(number, exhaust))!;
+      const axis = new Vector3(...(node.userData.axis as [number, number, number]));
+      return { node, rest: node.position.clone(), axis, cylinder: number - 1, exhaust, springs, springLength: springs.userData.length as number };
     }),
   );
   const rig: InternalsRig = {
@@ -63,6 +67,11 @@ export function prepareInternals(root: Object3D): InternalsRig {
     valves,
     flames,
     bores: cylinders.map(({ axis }) => new Vector3(...axis)),
+    pump: (() => {
+      const inner = named('Oil_pump')!;
+      const [lobes, outerLobes] = inner.userData.lobes as [number, number];
+      return { inner, outer: named('Oil_pump_outer')!, ratio: inner.userData.ratio as number, follow: lobes / outerLobes };
+    })(),
   };
   root.userData.rig = rig;
   return rig;
@@ -86,5 +95,15 @@ export function poseInternals(rig: InternalsRig, frame: Float32Array, burning: b
   for (const valve of rig.valves) {
     const lift = frame[valve.exhaust ? FRAME.exhaustLift(valve.cylinder) : FRAME.intakeLift(valve.cylinder)]!;
     valve.node.position.copy(valve.rest).addScaledVector(valve.axis, -lift);
+    valve.springs.scale.y = 1 - lift / valve.springLength;
   }
+}
+
+const TURN = 2 * Math.PI;
+
+/** Turns the oil pump by `crankDegrees` of crank rotation: its inner rotors at its ratio, its outer rings following. */
+export function turnPump(rig: InternalsRig, crankDegrees: number): void {
+  const step = (crankDegrees * rig.pump.ratio * Math.PI) / 180;
+  rig.pump.inner.rotation.z = (rig.pump.inner.rotation.z - step) % TURN;
+  rig.pump.outer.rotation.z = (rig.pump.outer.rotation.z - step * rig.pump.follow) % TURN;
 }

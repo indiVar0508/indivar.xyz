@@ -3,21 +3,24 @@
  * The same bytes run twice: in an AudioWorklet for the sound (audio/engineSound.ts) and here for the moving parts.
  */
 
+import type { Gearbox } from '../drive/gears';
+
 export const P60_WASM_URL = `${import.meta.env.BASE_URL}wasm/p60.wasm`;
 
 export type P60Exports = {
   memory: WebAssembly.Memory;
-  kin_update(crank: number): number;
+  kin_update(crank: number, load: number, rpm: number): number;
   kin_len(): number;
   p60_fire_angle(cylinder: number): number;
   p60_valve_centre(cylinder: number, exhaust: number): number;
   p60_bank_angle(cylinder: number): number;
   p60_pin_phase(cylinder: number): number;
   p60_constant(id: number): number;
+  p60_gearbox(id: number): number;
 };
 
 /** Indexes for `p60_constant`. */
-export const P60_CONSTANT = { crankRadius: 0, rodLength: 1, compressionHeight: 2, valveLift: 3, valveDuration: 4, camBaseRadius: 5, idleRpm: 6, limitRpm: 7 } as const;
+export const P60_CONSTANT = { crankRadius: 0, rodLength: 1, compressionHeight: 2, valveLift: 3, valveDuration: 4, camBaseRadius: 5, idleRpm: 6, limitRpm: 7, tyreRadius: 8, shiftSeconds: 9, efficiency: 10 } as const;
 
 /** Where each value sits in a kinematics frame. Cylinder indexes are 0–7 for cylinders 1–8. */
 export const FRAME = {
@@ -30,8 +33,26 @@ export const FRAME = {
   intakeLift: (i: number) => 34 + i * 2,
   exhaustLift: (i: number) => 35 + i * 2,
   glow: (i: number) => 50 + i,
-  length: 58,
+  spark: (i: number) => 58 + i,
+  injection: (i: number) => 66 + i,
+  /** How far the exhaust pulse has run down the header (0 to 1), or -1. */
+  exhaustPulse: (i: number) => 74 + i,
+  length: 82,
 } as const;
+
+/** The gearbox behind the engine, from the crate (crates/p60/src/drivetrain.rs). */
+export function readGearbox(wasm: P60Exports): Gearbox {
+  const teeth = (id: number) => wasm.p60_gearbox(id);
+  return {
+    constantMesh: [teeth(0), teeth(1)],
+    gears: Array.from({ length: 6 }, (_, k) => [teeth(2 + 2 * k), teeth(3 + 2 * k)] as const),
+    finalDrive: [teeth(14), teeth(15)],
+    tyreRadius: wasm.p60_constant(P60_CONSTANT.tyreRadius),
+    shiftSeconds: wasm.p60_constant(P60_CONSTANT.shiftSeconds),
+    efficiency: wasm.p60_constant(P60_CONSTANT.efficiency),
+    limitRpm: wasm.p60_constant(P60_CONSTANT.limitRpm),
+  };
+}
 
 let bytes: Promise<ArrayBuffer> | null = null;
 
@@ -57,6 +78,8 @@ export async function instantiateP60(source: BufferSource): Promise<P60Exports> 
 /** Kinematics frames for the moving parts, computed by the crate. */
 export class Kinematics {
   readonly fireAngles: number[];
+  /** The gearbox behind the engine (drive/gears.ts). */
+  readonly gearbox: Gearbox;
   private readonly wasm: P60Exports;
   private view: Float32Array | null = null;
 
@@ -64,11 +87,12 @@ export class Kinematics {
     if (wasm.kin_len() !== FRAME.length) throw new Error(`p60.wasm frames hold ${wasm.kin_len()} values, not ${FRAME.length}`);
     this.wasm = wasm;
     this.fireAngles = Array.from({ length: 8 }, (_, i) => wasm.p60_fire_angle(i + 1));
+    this.gearbox = readGearbox(wasm);
   }
 
-  /** The frame for a crank angle in degrees. The view is reused by the next call. */
-  frame(crank: number): Float32Array {
-    const at = this.wasm.kin_update(crank);
+  /** The frame for a crank angle in degrees, at an engine load (0 to 1) and speed. The view is reused by the next call. */
+  frame(crank: number, load = 0, rpm = 0): Float32Array {
+    const at = this.wasm.kin_update(crank, load, rpm);
     if (this.view?.buffer !== this.wasm.memory.buffer || this.view.byteOffset !== at) this.view = new Float32Array(this.wasm.memory.buffer, at, FRAME.length);
     return this.view;
   }

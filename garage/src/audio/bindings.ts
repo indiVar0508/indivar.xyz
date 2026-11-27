@@ -1,3 +1,4 @@
+import { refusalNote } from '../drive/gears';
 import { station } from '../music/station';
 import { useGarage, type GarageStore } from '../state/store';
 import { isHoodOpen } from '../state/view';
@@ -9,6 +10,11 @@ const radioPlaying = (state: GarageStore) => state.radioOpen && state.radio.stat
 /** Connects the store to the audio controller and the radio. Call once at startup. */
 export function bindAudio(): void {
   audio.onEngineStatus = (status) => useGarage.getState().setEngine(status);
+  audio.onGear = (gear) => useGarage.getState().setGear(gear);
+  audio.onShiftRefused = (up) => {
+    const { gear, setDriveNote } = useGarage.getState();
+    setDriveNote(refusalNote(up, gear));
+  };
   useGarage.subscribe((state, previous) => {
     const { setSound, setOwnTrack, setRadioOpen } = useGarage.getState();
     if (state.soundOn !== previous.soundOn) {
@@ -17,6 +23,7 @@ export function bindAudio(): void {
       if (!state.soundOn && state.radioOpen) station.pause();
       // The engine is heard, not just seen: with sound off it stops (the controller resets it).
       if (!state.soundOn && state.engine !== 'off') useGarage.getState().setEngine('off');
+      if (!state.soundOn && state.gear !== 0) useGarage.getState().setGear(0);
     }
     if (state.soundOn && isHoodOpen(state.view) !== isHoodOpen(previous.view)) audio.sfx('hood');
     // One music source at a time: the radio and the visitor's own track replace each other.
@@ -29,6 +36,7 @@ export function bindAudio(): void {
     }
     if (state.ownTrack && state.ownTrack !== previous.ownTrack && state.radioOpen) setRadioOpen(false);
     if (radioPlaying(state) !== radioPlaying(previous)) audio.setRadioPlaying(radioPlaying(state));
+    if (state.turbo !== previous.turbo) audio.setTurbo(state.turbo);
   });
   if (readSoundPref()) {
     // Browsers block audio until a gesture, so a remembered "on" waits for the first one, then stops listening.

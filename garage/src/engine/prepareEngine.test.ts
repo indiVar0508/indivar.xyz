@@ -1,6 +1,6 @@
 import { BoxGeometry, Group, Mesh, MeshStandardMaterial, Object3D, ShaderMaterial, Texture, type WebGLProgramParametersWithUniforms } from 'three';
 import { describe, expect, it } from 'vitest';
-import { ENGINE_PARTS, partNode } from './manifest';
+import { ENGINE_NODES, ENGINE_PARTS, partNode } from './manifest';
 import { prepareEngine, setHighlight, setXray } from './prepareEngine';
 
 /** The engine GLB's shape: Engine and Bay roots, a Part_* node per part, meshes sharing materials across parts. */
@@ -16,6 +16,14 @@ function fakeEngine(omit?: string) {
     engine.add(part);
   }
   bay.add(new Mesh(new BoxGeometry(), shared));
+  // The moving and marker nodes, as empties under the engine: pulleys carry their radius.
+  for (const name of ENGINE_NODES.filter((n) => !root.getObjectByName(n))) {
+    const node = Object.assign(new Object3D(), { name });
+    if (name.startsWith('Spin_')) node.userData.radius = name === 'Spin_crank' ? 0.075 : 0.03;
+    if (name.startsWith('Throttle_')) node.position.x = Number(name.slice(-1)) <= 4 ? -0.1 : 0.1;
+    if (name.startsWith('Injector_')) node.position.set(0.1, 0.3, Number(name.slice(-1)) / 10);
+    engine.add(node);
+  }
   if (omit) root.getObjectByName(omit)!.removeFromParent();
   return { root, shared };
 }
@@ -55,6 +63,22 @@ describe('prepareEngine', () => {
     const mesh = rig.parts.fuel.children[0] as Mesh;
     expect(mesh.castShadow && mesh.receiveShadow).toBe(true);
     expect(prepareEngine(root)).toBe(rig);
+  });
+});
+
+describe('the engine’s moving parts', () => {
+  it('finds each pulley with its ratio to the crank, each butterfly with its side, and the injector tips in order', () => {
+    const rig = prepareEngine(fakeEngine().root);
+    expect(rig.spins.map((spin) => [spin.node.name, spin.ratio])).toEqual([
+      ['Spin_crank', 1],
+      ['Spin_tensioner', 2.5],
+      ['Spin_alternator', 2.5],
+      ['Spin_water_pump', 2.5],
+      ['Spin_idler', 2.5],
+    ]);
+    expect(rig.throttles.map((throttle) => throttle.side)).toEqual([-1, -1, -1, -1, 1, 1, 1, 1]);
+    expect(rig.injectors[7]!.z).toBeCloseTo(0.8);
+    expect(rig.tailpipes.map((node) => node.name)).toEqual(['Tailpipe_left', 'Tailpipe_right']);
   });
 });
 

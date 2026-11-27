@@ -4,6 +4,7 @@
 //! and on the page (the moving parts) with no glue code. Each instance keeps one engine and one kinematics frame in
 //! static memory; JavaScript reads them through the pointers these functions return.
 
+pub mod drivetrain;
 pub mod engine;
 pub mod synth;
 pub mod timing;
@@ -73,17 +74,79 @@ pub extern "C" fn synth_rpm() -> f32 {
     synth().engine.rpm
 }
 
+/// What the engine gets from the throttle and idle control, 0 to 1.
+#[no_mangle]
+pub extern "C" fn synth_load() -> f32 {
+    synth().engine.effective
+}
+
+/// Fits or removes the game turbo kit. The real P60B40 is naturally aspirated.
+#[no_mangle]
+pub extern "C" fn synth_set_turbo(fitted: u32) {
+    synth().engine.turbo = fitted != 0;
+}
+
+/// Turbo boost, 0 to 1.
+#[no_mangle]
+pub extern "C" fn synth_boost() -> f32 {
+    synth().engine.boost
+}
+
 /// 0 off, 1 cranking, 2 running, 3 stopping.
 #[no_mangle]
 pub extern "C" fn synth_status() -> u32 {
     synth().engine.status as u32
 }
 
-/// Fills the kinematics frame for a crank angle (degrees) and returns it; see `timing::kinematics` for the layout.
+/// Changes gear: up (1) or down (0). Returns 1 if the gearbox took the change, 0 if it refused it (past 6th or
+/// neutral, mid-change, or into a gear that would over-rev the engine).
 #[no_mangle]
-pub extern "C" fn kin_update(crank: f32) -> *const f32 {
+pub extern "C" fn synth_shift(up: u32) -> u32 {
+    let drive = &mut synth().engine.drive;
+    (if up != 0 { drive.shift_up() } else { drive.shift_down() }) as u32
+}
+
+/// 0 neutral, 1 to 6 the gears.
+#[no_mangle]
+pub extern "C" fn synth_gear() -> u32 {
+    synth().engine.drive.gear as u32
+}
+
+/// The rear wheels' speed on the rollers, rad/s.
+#[no_mangle]
+pub extern "C" fn synth_wheel() -> f32 {
+    synth().engine.drive.wheel
+}
+
+/// Torque through the clutch, N·m: positive drives the wheels, negative is engine braking.
+#[no_mangle]
+pub extern "C" fn synth_clutch() -> f32 {
+    synth().engine.drive.clutch
+}
+
+/// The gearbox's tooth counts, by index: the constant-mesh pair (input, layshaft), then each gear's layshaft and
+/// output teeth from 1st to 6th, then the final drive's pinion and crown wheel.
+#[no_mangle]
+pub extern "C" fn p60_gearbox(id: u32) -> u32 {
+    let (cm, fd) = (drivetrain::CONSTANT_MESH, drivetrain::FINAL_DRIVE);
+    let mut teeth = [0u32; 16];
+    teeth[0] = cm.0;
+    teeth[1] = cm.1;
+    for (k, (lay, out)) in drivetrain::GEAR_TEETH.iter().enumerate() {
+        teeth[2 + 2 * k] = *lay;
+        teeth[3 + 2 * k] = *out;
+    }
+    teeth[14] = fd.0;
+    teeth[15] = fd.1;
+    teeth.get(id as usize).copied().unwrap_or(0)
+}
+
+/// Fills the kinematics frame for a crank angle (degrees), engine load (0 to 1) and speed (rpm), and returns it; see
+/// `timing::kinematics` for the layout.
+#[no_mangle]
+pub extern "C" fn kin_update(crank: f32, load: f32, rpm: f32) -> *const f32 {
     let frame = unsafe { (*FRAME.0.get()).get_or_insert([0.0; KIN_LEN]) };
-    timing::kinematics(crank, frame);
+    timing::kinematics(crank, load, rpm, frame);
     frame.as_ptr()
 }
 
@@ -113,7 +176,8 @@ pub extern "C" fn p60_pin_phase(cyl: u32) -> f32 {
 }
 
 /// Named constants, by index: crank radius, rod length, compression height, valve lift, valve duration, cam base
-/// radius (metres and crank degrees), idle and limiter rpm.
+/// radius (metres and crank degrees), idle and limiter rpm, the rear tyres' rolling radius (m), the seconds a gear
+/// change takes, and the share of the clutch's torque that reaches the wheels.
 #[no_mangle]
 pub extern "C" fn p60_constant(id: u32) -> f32 {
     match id {
@@ -125,6 +189,9 @@ pub extern "C" fn p60_constant(id: u32) -> f32 {
         5 => timing::CAM_BASE_RADIUS,
         6 => IDLE_RPM,
         7 => LIMIT_RPM,
+        8 => drivetrain::TYRE_RADIUS,
+        9 => drivetrain::SHIFT_SECONDS,
+        10 => drivetrain::EFFICIENCY,
         _ => f32::NAN,
     }
 }

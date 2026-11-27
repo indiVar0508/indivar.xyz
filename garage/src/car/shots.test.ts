@@ -78,6 +78,26 @@ describe('camera shots', () => {
     expect(shotFor({ kind: 'bay-part', id: 'crank' }, EXPECTED_BAY, true)).toEqual(engineShot(origin, 'crank'));
   });
 
+  it('frames the driveline from the engine’s front to the rear wheel on its rollers, clear of the panel and the dock', () => {
+    // On a desktop screen the panel covers the right ~28% (from x ≈ 0.45 in device coordinates) and the engine dock
+    // the bottom strip, so the whole driveline has to sit left of and above them.
+    const { position, target } = CAR_SHOTS.drivetrain;
+    const points: Vec3[] = [[0, 0.62, 1.62], [0, 0.29, 0.96], [0, 0.32, -1.2], [0.8, 0, -1.2], [0.8, 0.64, -1.2], [-0.8, 0.32, -1.2], [0.8, 0, -1.62], [0.8, 0, 1.85]];
+    for (const aspect of [1.6, 16 / 9]) {
+      const camera = new PerspectiveCamera(fovFor(aspect), aspect, 0.05, 60);
+      camera.position.set(...position);
+      camera.lookAt(...target);
+      camera.updateMatrixWorld();
+      for (const point of points) {
+        const ndc = new Vector3(...point).project(camera);
+        expect(ndc.x, `${point} at ${aspect}`).toBeGreaterThan(-0.92);
+        expect(ndc.x, `${point} at ${aspect}`).toBeLessThan(0.4);
+        expect(ndc.y, `${point} at ${aspect}`).toBeGreaterThan(-0.75);
+        expect(ndc.y, `${point} at ${aspect}`).toBeLessThan(0.85);
+      }
+    }
+  });
+
   it('frames the whole engine when looking inside', () => {
     const { position, target } = insideShot(origin);
     const camera = new PerspectiveCamera(CAMERA_FOV, 16 / 9, 0.05, 60);

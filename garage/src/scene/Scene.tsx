@@ -2,6 +2,7 @@ import { ContactShadows, Sparkles } from '@react-three/drei';
 import { Car } from '../car/Car';
 import { engineOrigin } from '../car/shots';
 import { ENGINE_TOPICS } from '../content/engine';
+import { Drivetrain } from '../drive/Drivetrain';
 import { ENGINE_ANCHORS } from '../engine/anchors';
 import { Engine } from '../engine/Engine';
 import { useGarage } from '../state/store';
@@ -40,6 +41,7 @@ export function Scene() {
                 />
               )}
             />
+            <Drivetrain car={rig} />
             <CarHotspots rig={rig} />
           </>
         )}

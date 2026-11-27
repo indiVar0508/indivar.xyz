@@ -1,6 +1,6 @@
-import { BackSide, BoxGeometry, DoubleSide, FrontSide, Group, Mesh, MeshPhysicalMaterial, MeshStandardMaterial, Object3D, Texture } from 'three';
+import { BackSide, BoxGeometry, DoubleSide, FrontSide, Group, Mesh, MeshPhysicalMaterial, MeshStandardMaterial, Object3D, ShaderMaterial, Texture } from 'three';
 import { describe, expect, it } from 'vitest';
-import { prepareCar } from './prepareCar';
+import { prepareCar, setCarXray } from './prepareCar';
 
 function fakeCar(omit?: string): Group {
   const root = new Group();
@@ -21,11 +21,36 @@ function fakeCar(omit?: string): Group {
   const wheels: Record<string, [number, number, number]> = { FL: [0.8, 0.32, 1.45], FR: [-0.8, 0.32, 1.45], RL: [0.8, 0.32, -1.21], RR: [-0.8, 0.32, -1.21] };
   for (const [label, position] of Object.entries(wheels)) add(root, `Marker_Wheel_${label}`, new Object3D()).position.set(...position);
   add(root, 'Marker_EngineBay', new Object3D()).position.set(0, 0.32, 1.49);
+  for (const label of ['RL', 'RR']) {
+    const wheel = add(body, `Wheel_${label}`, new Object3D());
+    wheel.position.set(...wheels[label]!);
+    add(wheel, `Tyres_${label}`, new Mesh(new BoxGeometry(), new MeshStandardMaterial()));
+  }
   if (omit) root.getObjectByName(omit)!.removeFromParent();
   return root;
 }
 
 describe('prepareCar', () => {
+  it('hands over the driven wheels, which turn on the rolling road', () => {
+    const rig = prepareCar(fakeCar());
+    expect(rig.wheels.map((wheel) => wheel.name)).toEqual(['Wheel_RL', 'Wheel_RR']);
+  });
+
+  it('turns the body to a ghost for the drivetrain x-ray, keeps the turning wheels solid, and puts it all back', () => {
+    const rig = prepareCar(fakeCar());
+    const shell = rig.root.getObjectByName('Paint_Shell') as Mesh;
+    const tyre = rig.root.getObjectByName('Tyres_RL') as Mesh;
+    const [paint, rubber] = [shell.material, tyre.material];
+    setCarXray(rig, true);
+    expect(shell.material).toBeInstanceOf(ShaderMaterial);
+    expect(shell.castShadow).toBe(false);
+    expect(tyre.material).toBe(rubber);
+    setCarXray(rig, false);
+    expect(shell.material).toBe(paint);
+    expect(shell.castShadow).toBe(true);
+  });
+
+
   it('names every missing contract node', () => {
     expect(() => prepareCar(fakeCar('Marker_EngineBay'))).toThrow('missing nodes: Marker_EngineBay');
   });

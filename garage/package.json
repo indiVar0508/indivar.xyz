@@ -18,7 +18,9 @@
     "check:bundle": "node tools/check-bundle.ts",
     "qa": "playwright test",
     "build:wasm": "node tools/build-wasm.ts",
-    "build:internals": "node tools/build-internals.ts"
+    "build:internals": "node tools/build-internals.ts",
+    "build:turbo": "node tools/build-turbo.ts",
+    "build:drivetrain": "node tools/build-drivetrain.ts"
   },
   "dependencies": {
     "@fontsource/pt-mono": "^5.3.0",
