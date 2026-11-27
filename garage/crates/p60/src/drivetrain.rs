@@ -62,6 +62,10 @@ pub struct Drivetrain {
     pub wheel: f32,
     /// Torque through the clutch (N·m); positive drives the car, negative is engine braking.
     pub clutch: f32,
+    /// Torque the engine and gearbox put into their mounts (N·m), positive as the engine drives: what spins up the
+    /// crank plus what the gearbox sends on down the propshaft (ignoring the gears' small losses). In gear it is the
+    /// clutch's torque multiplied by the gear, so the engine leans hardest in 1st.
+    pub mount: f32,
     pub(crate) locked: bool,
     shift: f32,
     upshift: bool,
@@ -130,10 +134,17 @@ impl Drivetrain {
         (ROLLING + DRAG * v * v) * TYRE_RADIUS
     }
 
+    /// The mounts' torque when the engine makes `torque` (N·m) with the clutch passing `self.clutch`: what is left
+    /// spins up the crank, and the gearbox multiplies what passes.
+    fn mount_torque(&self, torque: f32) -> f32 {
+        torque - self.clutch + self.clutch * gearbox_ratio(self.gear)
+    }
+
     /// The wheels roll on against the road load, and against the rollers' brake when `braking` (the engine is off).
     pub fn coast(&mut self, dt: f32, braking: bool) {
         self.shift = (self.shift - dt).max(0.0);
         self.clutch = 0.0;
+        self.mount = 0.0;
         self.locked = false;
         let brake = if braking && self.wheel > 0.0 { ROLLER_BRAKE / TYRE_RADIUS } else { 0.0 };
         self.wheel = (self.wheel - (self.road_load() / WHEEL_INERTIA + brake) * dt).max(0.0);
@@ -143,12 +154,13 @@ impl Drivetrain {
     /// revving; `running` says the engine is firing (otherwise the clutch stays open). Returns the new engine speed.
     pub fn step(&mut self, rpm: f32, net: f32, running: bool, dt: f32) -> f32 {
         let capacity = if running { CLUTCH_CAPACITY * self.engagement(rpm) } else { 0.0 };
+        let torque = net * NM_PER_RPM_S;
         if capacity <= 0.0 {
             self.coast(dt, !running);
+            self.mount = torque;
             return (rpm + net * dt).max(0.0);
         }
         self.shift = (self.shift - dt).max(0.0);
-        let torque = net * NM_PER_RPM_S;
         let load = self.road_load();
         let g = overall_ratio(self.gear);
         let reflected = WHEEL_INERTIA / (g * g * EFFICIENCY);
@@ -158,6 +170,7 @@ impl Drivetrain {
             let through = torque - ENGINE_INERTIA * alpha;
             if through.abs() <= capacity {
                 self.clutch = through;
+                self.mount = self.mount_torque(torque);
                 let w = (engine + alpha * dt).max(0.0);
                 self.wheel = w / g;
                 return w / RPM;
@@ -170,6 +183,7 @@ impl Drivetrain {
         let engine = (engine + (torque - through) / ENGINE_INERTIA * dt).max(0.0);
         self.wheel = (self.wheel + (through * g * EFFICIENCY - load) / WHEEL_INERTIA * dt).max(0.0);
         self.clutch = through;
+        self.mount = self.mount_torque(torque);
         if slip == 0.0 || (engine - self.wheel * g).signum() != slip.signum() {
             // The two sides met this step: lock them at the speed that keeps their momentum.
             let w = (ENGINE_INERTIA * engine + reflected * self.wheel * g) / (ENGINE_INERTIA + reflected);

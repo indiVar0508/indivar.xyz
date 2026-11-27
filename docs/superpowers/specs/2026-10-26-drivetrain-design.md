@@ -102,3 +102,23 @@ gearbox goes behind the engine, as in the road M3.
   - Moving parts: 0.3 MB and 54,100 triangles, with the budget raised from 40k to 60k.
   - JavaScript: 449 of 450 KB gzip. The budget is effectively full; the next feature needs code trimmed or the
     budget raised.
+
+## 6. Under the hood (2026-11-27)
+
+The owner changed gear with the hood open and saw nothing change. Two causes, measured in the page:
+- Outside the x-ray the belt drive turned at the strobe cap (about 1,200°/s) at any speed above about 200 rpm, so rev changes never showed.
+- The engine's roll followed only the crank's acceleration. In gear the car's inertia slows that 8–45×, so the engine
+  leaned 0.1° pulling in 1st against 0.7° revving in neutral: the opposite of a real engine.
+
+Fixes:
+- **Mount torque in the crate.** `Drivetrain::mount` is what spins up the crank plus what the gearbox sends on down the
+  propshaft: the engine's torque less the clutch's, plus the clutch's times the gearbox ratio (ignoring the gears' small
+  losses). The worklet reports it as `mount`. Pulling at 5,000 rpm it is about 2.2× the engine's torque in 1st and
+  about equal to it in 6th. An upshift unloads it (spark cut, clutch open) until the next gear takes the drive, and
+  engine braking reverses it.
+- **Lean.** The engine leans by the mount torque over an illustrative stiffness of 28,000 N·m/rad, capped at 2.6°,
+  through the existing spring-damper. Measured: 0.8° revving in neutral, 1.9° pulling in 1st. That is softer than a race
+  car's mounts, and the panel says so.
+- **Belts.** Every pulley is slowed by one factor, so the fastest (the tensioner, 2.5× the crank) reaches the strobe
+  cap at the 8,500 rpm limiter. The drive keeps its ratios and follows the revs: about 73°/s for the crank pulley at
+  idle, 480°/s at the limiter.

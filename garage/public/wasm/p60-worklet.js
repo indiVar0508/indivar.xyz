@@ -1,6 +1,6 @@
 // The P60B40's sound, on the audio thread. The page passes in p60.wasm's bytes and sends commands; each block is
-// rendered into wasm memory and copied out. Engine speed, load, boost, the gear, the wheels' speed on the rollers and
-// the clutch's torque are reported back about 45 times a second, while anything turns.
+// rendered into wasm memory and copied out. Engine speed, load, boost, the gear, the wheels' speed on the rollers, the
+// clutch's torque and the mounts' are reported back about 45 times a second, while anything turns.
 // Plain JavaScript: an AudioWorklet module is loaded by URL, outside the app's bundle.
 
 const REPORT_EVERY = 8; // blocks of 128 frames
@@ -41,6 +41,7 @@ class P60Processor extends AudioWorkletProcessor {
       gear: this.gear,
       wheel: wasm.synth_wheel(),
       clutch: wasm.synth_clutch(),
+      mount: wasm.synth_mount(),
       ...extra,
     });
   }

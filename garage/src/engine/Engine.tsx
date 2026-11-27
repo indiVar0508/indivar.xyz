@@ -14,7 +14,7 @@ import { Internals } from './Internals';
 import { insideLive } from './live';
 import { ENGINE_PARTS } from './manifest';
 import { prepareEngine, setHighlight, setXray } from './prepareEngine';
-import { butterflyAngle, spinStep } from './motion';
+import { beltStep, butterflyAngle } from './motion';
 import { newShake, stepShake } from './shake';
 import { TurboKit } from './TurboKit';
 
@@ -35,7 +35,8 @@ export const ENGINE_URL = `${import.meta.env.BASE_URL}models/p60b40.glb`;
  * The P60B40 and its bay, modelled and baked by tools/blender/build_engine.py. The engine sits at `origin`; the bay is
  * in car space. With the hood open, clicking a part opens its topic and the selected part glows. Parts take clicks
  * only, not hover, so the pointer never raycasts the whole engine as it moves. `hood` is the car's hood pivot.
- * While it runs, the engine shakes on its mounts, its belt drive turns and its throttles open; looking inside turns it
+ * While it runs, the engine leans on its mounts with the torque it sends through the gearbox (hardest in 1st, rocking
+ * back through a gear change), its belt drive turns with the revs and its throttles open; looking inside turns it
  * to an x-ray around its moving parts. In the gearbox and drive view it shows as an x-ray through the body, without
  * the bay. The game turbo kit bolts on when its switch is on.
  */
@@ -52,6 +53,7 @@ export function Engine({ origin, hood, hotspots }: { origin: Vec3; hood: Object3
   const inside = useGarage((state) => state.inside) && open;
   const drive = useGarage((state) => isDriveView(state.view));
   const shake = useMemo(newShake, []);
+  const fastest = useMemo(() => Math.max(...rig.spins.map(({ ratio }) => ratio)), [rig]);
   const throttle = useMemo(() => ({ angle: butterflyAngle(0) }), []);
 
   useEffect(() => {
@@ -63,21 +65,21 @@ export function Engine({ origin, hood, hotspots }: { origin: Vec3; hood: Object3
     rig.bay.visible = !drive;
   }, [rig, drive]);
   useEffect(() => {
-    if (QA) Object.assign(window, { garageBelt: () => rig.spins.map(({ node }) => node.rotation.z) });
+    if (QA) Object.assign(window, { garageBelt: () => rig.spins.map(({ node }) => node.rotation.z), garageMount: () => rig.engine.rotation.z });
   }, [rig]);
   useFrame((_, dt) => {
     // Nothing sees the engine while the hood is shut (the radiator fills the grille), so skip drawing it then, unless
     // the body is an x-ray around the driveline.
     rig.engine.visible = hood.rotation.x !== 0 || isDriveView(useGarage.getState().view);
-    const [x, y] = stepShake(shake, engineLive.rpm, engineLive.status !== 'off', dt);
+    const [x, y] = stepShake(shake, engineLive.rpm, engineLive.mount, engineLive.status !== 'off', dt);
     const still = useGarage.getState().reducedMotion;
     rig.engine.position.set(origin[0] + (still ? 0 : x), origin[1] + (still ? 0 : y), origin[2]);
     rig.engine.rotation.z = still ? 0 : shake.roll;
-    // The belt drive: in the x-ray it follows the slowed crank; outside, its real speed up to what the screen can show.
+    // The belt drive: in the x-ray it follows the slowed crank; outside, slowed so its fastest pulley never strobes.
     const xray = useGarage.getState().inside && hood.rotation.x !== 0;
     for (const { node, ratio } of rig.spins) {
       if (xray) node.rotation.z = -MathUtils.degToRad(insideLive.crank * ratio);
-      else node.rotation.z -= MathUtils.degToRad(spinStep(engineLive.rpm, ratio, Math.min(dt, 0.1)));
+      else node.rotation.z -= MathUtils.degToRad(beltStep(engineLive.rpm, ratio, fastest, Math.min(dt, 0.1)));
     }
     throttle.angle += (butterflyAngle(engineLive.load) - throttle.angle) * Math.min(1, dt / 0.06);
     for (const { node, side } of rig.throttles) node.rotation.z = side * MathUtils.degToRad(throttle.angle);

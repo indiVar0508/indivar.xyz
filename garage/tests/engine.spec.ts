@@ -194,3 +194,52 @@ test('changes gear and drives the rear wheels on the rollers, and shows the driv
   await expect(page.locator('.engine-note')).toHaveText('6th is the top gear.');
   expect(errors).toEqual([]);
 });
+
+type MountWindow = { garageMount(): number; garageBelt(): number[] };
+
+/** Over `ms`, sampled every frame: the most the engine leans (degrees) and the crank pulley's mean speed (°/s). */
+const watch = (page: Page, ms: number) =>
+  page.evaluate(
+    (ms) =>
+      new Promise<{ lean: number; belt: number }>((done) => {
+        const w = window as unknown as MountWindow;
+        let [lean, turned, last] = [0, 0, w.garageBelt()[0]!];
+        const start = performance.now();
+        const tick = (now: number) => {
+          lean = Math.max(lean, Math.abs(w.garageMount()));
+          const angle = w.garageBelt()[0]!;
+          turned += Math.abs(Math.atan2(Math.sin(angle - last), Math.cos(angle - last)));
+          last = angle;
+          if (now - start < ms) requestAnimationFrame(tick);
+          else done({ lean: (lean * 180) / Math.PI, belt: (turned * 180) / Math.PI / ((now - start) / 1000) });
+        };
+        requestAnimationFrame(tick);
+      }),
+    ms,
+  );
+
+test('shows a gear change under the hood: the engine leans harder pulling in gear, and the belts follow the revs', async ({ page }, info) => {
+  const errors = await open(page, '?qa&quality=low');
+  await page.getByRole('button', { name: 'Open the hood' }).click();
+  await page.getByRole('button', { name: 'Start engine' }).click();
+  await expect.poll(() => state(page, 'engine'), { timeout: 20_000 }).toBe('running');
+  await page.waitForTimeout(2500);
+  const idle = await watch(page, 1000);
+
+  await page.keyboard.down('r');
+  const neutral = await watch(page, 1200);
+  await page.keyboard.up('r');
+  await expect.poll(() => rpm(page), { timeout: 10_000 }).toBeLessThan(2500);
+
+  await page.keyboard.press('ArrowUp');
+  await expect.poll(() => state(page, 'gear'), { timeout: 5_000 }).toBe(1);
+  await page.keyboard.down('r');
+  const first = await watch(page, 2000);
+  await page.screenshot({ path: info.outputPath('pulling-in-first.png') });
+  await page.keyboard.up('r');
+
+  expect(first.lean, `1st ${first.lean}° vs neutral ${neutral.lean}°`).toBeGreaterThan(1.5 * neutral.lean);
+  expect(first.lean).toBeGreaterThan(1);
+  expect(neutral.belt, `revving ${neutral.belt}°/s vs idle ${idle.belt}°/s`).toBeGreaterThan(2 * idle.belt);
+  expect(errors).toEqual([]);
+});
