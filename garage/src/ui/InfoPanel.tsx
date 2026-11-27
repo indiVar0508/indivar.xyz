@@ -116,20 +116,16 @@ function PanelBody({ topic, eyebrow, hint, extra }: { topic: Topic; eyebrow: str
 export function InfoPanel() {
   const view = useGarage((state) => state.view);
   const inside = useGarage((state) => state.inside);
+  const xray = useGarage((state) => state.xray);
   const engine = useGarage((state) => state.engine);
-  const topic = topicFor(view, inside);
+  const topic = topicFor(view, inside, xray);
   if (!topic) return null;
   const inBay = view.kind === 'bay' || view.kind === 'bay-part';
   if (topic.id === 'running') {
     const note = engine === 'off' || engine === 'stopping' ? 'Start the engine to see it run.' : null;
-    const extra = (
-      <>
-        <ShiftSteps />
-        <FiringStrip note={note} />
-      </>
-    );
-    return <PanelBody key={topic.id} topic={topic} eyebrow="P60B40 V8" hint={null} extra={extra} />;
+    return <PanelBody key={topic.id} topic={topic} eyebrow="P60B40 V8" hint={null} extra={<FiringStrip note={note} />} />;
   }
+  if (topic.id === 'gearbox-running') return <PanelBody key={topic.id} topic={topic} eyebrow="BMW M3 GTR" hint={null} extra={<ShiftSteps />} />;
   if (topic.id === 'drivetrain') {
     const extra = (
       <>

@@ -9,7 +9,8 @@ import { crankTurn, wheelTurn } from '../engine/motion';
 import { loadKinematics } from '../engine/p60';
 import { QA } from '../qa';
 import { useGarage } from '../state/store';
-import { isDriveView, isHoodOpen } from '../state/view';
+import { isDriveView, isHoodOpen, showsGearbox } from '../state/view';
+import { GearboxLabels, type ShownChange } from './GearboxLabels';
 import { DriveSpin } from './gears';
 import { poseDrivetrain, prepareDrivetrain, setDriveGlow } from './prepareDrivetrain';
 import { replayCue, replayPose, replaySeconds, type Change, type ReplayPose, type ReplayStep } from './shiftReplay';
@@ -25,7 +26,7 @@ type Replay = { change: Change; elapsed: number; step: ReplayStep | null | undef
 
 /**
  * The rolling road under the rear wheels, always there, and the driveline behind the engine, shown with the body as an
- * x-ray around it in the gearbox and drive view and when looking inside the engine. The rear wheels and the rollers
+ * x-ray around it in the gearbox and drive view and when looking inside at the gearbox. The rear wheels and the rollers
  * turn at the speed the audio thread reports. In the x-ray everything turns slowed 40× like the engine's moving parts,
  * each shaft at its true ratio, and each gear change is replayed slowed as much, a step at a time.
  */
@@ -34,8 +35,10 @@ function Model({ car }: { car: CarRig }) {
   const box = use(loadKinematics()).gearbox;
   const rig = useMemo(() => prepareDrivetrain(gltf.scene, box), [gltf, box]);
   const spin = useMemo(() => new DriveSpin(box), [box]);
-  const drive = useGarage((state) => isDriveView(state.view) || (state.inside && isHoodOpen(state.view)));
+  const drive = useGarage((state) => isDriveView(state.view) || (state.inside && isHoodOpen(state.view) && showsGearbox(state.xray)));
+  const labels = useGarage((state) => state.inside && isHoodOpen(state.view) && state.xray === 'gearbox');
   const replay = useRef<Replay | null>(null);
+  const shown = useRef<ShownChange>(null);
   const seen = useRef({ gear: engineLive.gear, rpm: engineLive.rpm });
 
   useEffect(() => {
@@ -69,6 +72,7 @@ function Model({ car }: { car: CarRig }) {
     }
     seen.current.rpm = rpm;
     const playing = replay.current;
+    shown.current = null;
     if (!playing) return null;
     playing.elapsed += step;
     // The crate's change is over in shiftSeconds; once the clutch has taken up the new gear, the revs show where it left them.
@@ -82,6 +86,7 @@ function Model({ car }: { car: CarRig }) {
       playing.step = pose.step;
       useGarage.getState().setReplay({ change: playing.change, step: pose.step });
     }
+    shown.current = { change: playing.change, pose };
     if (progress >= 1) replay.current = null;
     return pose;
   };
@@ -105,7 +110,12 @@ function Model({ car }: { car: CarRig }) {
     }
   });
 
-  return <primitive object={rig.root} />;
+  return (
+    <>
+      <primitive object={rig.root} />
+      {labels && <GearboxLabels rig={rig} box={box} shown={shown} />}
+    </>
+  );
 }
 
 /** If the drivetrain can't load, the wheels simply stay still and the rest of the garage carries on. */

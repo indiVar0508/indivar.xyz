@@ -9,7 +9,7 @@ import { QA } from '../qa';
 import { ENGINE_TOPIC_IDS, type EngineTopicId } from '../content/engine';
 import type { Vec3 } from '../math';
 import { useGarage } from '../state/store';
-import { isDriveView, isHoodOpen } from '../state/view';
+import { isDriveView, isHoodOpen, showsGearbox } from '../state/view';
 import { Internals } from './Internals';
 import { insideLive } from './live';
 import { ENGINE_PARTS } from './manifest';
@@ -52,6 +52,8 @@ export function Engine({ origin, hood, hotspots }: { origin: Vec3; hood: Object3
   const selected = view.kind === 'bay-part' ? view.id : null;
   const inside = useGarage((state) => state.inside) && open;
   const drive = useGarage((state) => isDriveView(state.view));
+  // Looking at the gearbox, the bay turns x-ray too, or its back wall would hide the clutch and gears.
+  const gearbox = useGarage((state) => showsGearbox(state.xray)) && inside;
   const shake = useMemo(newShake, []);
   const fastest = useMemo(() => Math.max(...rig.spins.map(({ ratio }) => ratio)), [rig]);
   const throttle = useMemo(() => ({ angle: butterflyAngle(0) }), []);
@@ -60,7 +62,7 @@ export function Engine({ origin, hood, hotspots }: { origin: Vec3; hood: Object3
     rig.engine.position.set(...origin);
   }, [rig, origin]);
   useEffect(() => setHighlight(rig, open ? selected : null), [rig, open, selected]);
-  useEffect(() => setXray(rig, inside || drive, selected), [rig, inside, drive, selected]);
+  useEffect(() => setXray(rig, inside || drive, selected, gearbox), [rig, inside, drive, selected, gearbox]);
   useEffect(() => {
     rig.bay.visible = !drive;
   }, [rig, drive]);

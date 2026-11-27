@@ -96,3 +96,18 @@ export const CAR_TOPICS: Record<CarTopicId, Topic<CarTopicId>> = {
     ],
   },
 };
+
+/** Shown while looking inside at the gearbox, alone or behind the engine. */
+export const GEARBOX_RUNNING: Topic<'gearbox-running'> = {
+  id: 'gearbox-running',
+  title: 'How the gearbox works',
+  summary: 'Six gears always turning; a dog ring locks one to the wheels.',
+  real: [
+    { text: 'A triple-disc carbon-fibre clutch and a straight-cut six-speed manual gearbox.', badge: 'verified', sources: [S.bmwPress2001] },
+    { text: 'The clutch joins the engine to the input shaft, which turns the layshaft below it. Each gear on the layshaft is always meshed with a partner on the output shaft, so all six pairs turn all the time, each at its own speed: the labels show them.', badge: 'illustrative', sources: [] },
+    { text: 'The gears on the output shaft spin free on it until a dog ring, which turns with the shaft, slides into one and locks it. That gear drives the wheels, so it turns at exactly the output shaft’s speed; the others don’t.', badge: 'illustrative', sources: [] },
+    { text: 'Changing gear takes about a tenth of a second, so the x-ray replays it slowed 40×: the clutch opens, a fork slides the ring out of one gear and into the next, and the clutch closes as the revs change to suit the new gear.', badge: 'illustrative', sources: [] },
+    { text: 'Shown slowed 40×. The ratios and the layout are illustrative, and the clutch opens far wider than a real one, which moves about a millimetre.', badge: 'illustrative', sources: [] },
+  ],
+  game: [],
+};

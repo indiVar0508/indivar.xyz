@@ -4,9 +4,10 @@ import type { EngineTopicId } from '../content/engine';
 import { ENGINE_ANCHORS, ENGINE_OFFSET } from '../engine/anchors';
 import { ROOM } from '../scene/layout';
 import { add, dot, length, normalize, scale, sub, type Vec3 } from '../math';
-import type { View } from '../state/view';
+import type { View, XrayView } from '../state/view';
 
-export type Shot = { position: Vec3; target: Vec3 };
+/** Where the camera sits and looks; `zoom` narrows its lens (1 is the normal lens), for a close look from afar. */
+export type Shot = { position: Vec3; target: Vec3; zoom?: number };
 export type CarShotId = 'showroom' | 'bay' | Exclude<CarTopicId, 'hood'>;
 
 /** Solid volumes of the car (lower body, cabin, rear wing), from prepare-report.json. */
@@ -66,29 +67,33 @@ export function engineShot(origin: Vec3, id: EngineTopicId): Shot {
   return { position: add(target, scale(direction, ENGINE_VIEW_DISTANCE)), target };
 }
 
-/**
- * Looking inside: from the car's right, a little above the engine, so the back of the engine, the clutch behind it and
- * the gearbox line up across the screen through the x-ray, left of the panel, with the gears side-on, big enough to
- * watch a gear change.
- */
-const INSIDE_TARGET: Vec3 = [0, 0.2, -0.5];
-const INSIDE_DIRECTION: Vec3 = [1, 0.5, 0];
-const INSIDE_DISTANCE = 1.5;
+/** Each x-ray view's shot, in engine space: what it looks at, from which way, and how far off. */
+const INSIDE_SHOTS: Record<XrayView, { target: Vec3; direction: Vec3; distance: number; zoom?: number }> = {
+  // The engine, from above the nose, so all eight cylinders show through the x-ray.
+  engine: { target: [0, 0.16, 0.02], direction: add(normalize([0.35, 1, 0.25]), ENGINE_VIEW_BIAS), distance: 2.0 },
+  // From above the car's front right: the whole engine, both banks, with the clutch and gearbox running on behind it.
+  both: { target: [0, 0.1, -0.3], direction: [1, 1.5, 0.6], distance: 2.4 },
+  // Close on the clutch and gearbox from above the car's right, tilted so the layshaft's gears show beside the output
+  // shaft's, with room above and below for their labels. The camera stays outside the body and zooms its lens
+  // instead, so orbiting can't take it inside.
+  gearbox: { target: [0, -0.06, -0.65], direction: [1, 1.4, 0.15], distance: 1.6, zoom: 1.9 },
+};
 
-export function insideShot(origin: Vec3): Shot {
-  const target = add(origin, INSIDE_TARGET);
-  return { position: add(target, scale(normalize(INSIDE_DIRECTION), INSIDE_DISTANCE)), target };
+export function insideShot(origin: Vec3, xray: XrayView = 'engine'): Shot {
+  const { target, direction, distance, zoom } = INSIDE_SHOTS[xray];
+  const at = add(origin, target);
+  return { position: add(at, scale(normalize(direction), distance)), target: at, ...(zoom ? { zoom } : {}) };
 }
 
 /** The camera shot for a view. Looking inside changes only the bay's overview; part views keep their own. */
-export function shotFor(view: View, bay: Vec3, inside = false): Shot {
+export function shotFor(view: View, bay: Vec3, inside = false, xray: XrayView = 'engine'): Shot {
   switch (view.kind) {
     case 'showroom':
       return CAR_SHOTS.showroom;
     case 'focus':
       return CAR_SHOTS[view.id];
     case 'bay':
-      return inside ? insideShot(engineOrigin(bay)) : CAR_SHOTS.bay;
+      return inside ? insideShot(engineOrigin(bay), xray) : CAR_SHOTS.bay;
     case 'bay-part':
       return engineShot(engineOrigin(bay), view.id);
   }
@@ -137,8 +142,9 @@ const ORBIT_FREEDOM = {
   focus: { azimuth: 0.5, up: 0.3, down: 0.3, nearer: 0.75, farther: 1.5 },
   bay: { azimuth: 0.4, up: 0.25, down: 0.15, nearer: 0.8, farther: 1.4 },
   'bay-part': { azimuth: 0.3, up: 0.06, down: 0, nearer: 1, farther: 1.3 },
-  // Looking inside from beside the car: no closer, or swinging back it would reach the cabin.
-  inside: { azimuth: 0.4, up: 0.25, down: 0.15, nearer: 1, farther: 1.4 },
+  // Looking inside from beside the car: no closer, or swinging round it would reach the body.
+  both: { azimuth: 0.4, up: 0.25, down: 0.15, nearer: 1, farther: 1.4 },
+  gearbox: { azimuth: 0.3, up: 0.25, down: 0.1, nearer: 1, farther: 1.4 },
 } as const;
 
 /**
@@ -146,9 +152,9 @@ const ORBIT_FREEDOM = {
  * which keeps the camera outside the car; every other view keeps the camera near its shot, so it can't swing
  * through the body or the open hood. The room itself is enforced separately with CAMERA_BOUNDS.
  */
-export function orbitLimits(view: View, shot: Shot, inside = false): OrbitLimits {
+export function orbitLimits(view: View, shot: Shot, inside = false, xray: XrayView = 'engine'): OrbitLimits {
   if (view.kind === 'showroom') return { minAzimuth: -Infinity, maxAzimuth: Infinity, minPolar: 0.35, maxPolar: 1.45, minDistance: 3, maxDistance: 7.5 };
-  const freedom = ORBIT_FREEDOM[inside && view.kind === 'bay' ? 'inside' : view.kind];
+  const freedom = ORBIT_FREEDOM[inside && view.kind === 'bay' && xray !== 'engine' ? xray : view.kind];
   const offset = sub(shot.position, shot.target);
   const distance = length(offset);
   const azimuth = Math.atan2(offset[0], offset[2]);

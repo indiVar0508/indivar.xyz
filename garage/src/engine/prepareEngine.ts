@@ -144,21 +144,21 @@ void main() {
 }
 
 /**
- * Shows the engine as an x-ray (or puts it back), so the moving parts inside show through, and its bay too, so the
- * clutch and gearbox behind it show. Both stop casting shadows meanwhile, or they would still darken the parts inside.
+ * Shows the engine as an x-ray (or puts it back), so the moving parts inside show through, and with `bay` its bay too,
+ * so the clutch and gearbox behind it show. Ghosts stop casting shadows, or they would still darken the parts inside.
  */
-export function setXray(rig: EngineRig, on: boolean, selected: EngineTopicId | null): void {
-  const ghost = (root: Object3D, material: ShaderMaterial) =>
+export function setXray(rig: EngineRig, on: boolean, selected: EngineTopicId | null, bay = false): void {
+  const ghost = (root: Object3D, material: ShaderMaterial, ghosted: boolean) =>
     root.traverse((object) => {
       if (!(object instanceof Mesh)) return;
       object.userData.solid ??= object.material;
       object.userData.shadow ??= object.castShadow;
-      object.material = on ? material : object.userData.solid;
-      object.castShadow = on ? false : object.userData.shadow;
+      object.material = ghosted ? material : object.userData.solid;
+      object.castShadow = ghosted ? false : object.userData.shadow;
     });
   for (const id of ENGINE_PARTS) {
     rig.ghosts[id].uniforms.edge!.value = id === selected ? GHOST_SELECTED_EDGE : GHOST_EDGE;
-    ghost(rig.parts[id], rig.ghosts[id]);
+    ghost(rig.parts[id], rig.ghosts[id], on);
   }
-  ghost(rig.bay, rig.bayGhost);
+  ghost(rig.bay, rig.bayGhost, on && bay);
 }

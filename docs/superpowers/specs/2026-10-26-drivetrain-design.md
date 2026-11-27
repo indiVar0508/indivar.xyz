@@ -127,30 +127,41 @@ Fixes:
 
 The lean and belts of §6 were still too small and quick to see: the crate's change is over in 0.12 s, and the parts
 that change gear sat behind the engine, shown only in the gearbox view at full speed. The owner asked to see what
-happens inside when the gear changes, with the gearbox visible.
+happens inside when the gear changes, with the gearbox visible; a first try put engine and gearbox in one side view
+with only colour showing the change, which was too small to follow and didn't explain it. A 2D diagram mockup was
+rejected: the owner wanted the real parts running live, like the engine's x-ray, with separate views.
 
-- **Look inside shows the clutch and gearbox.** The driveline shows and the body turns x-ray whenever the hood is open
-  and the visitor looks inside, as in the gearbox view. The engine bay's shell turns x-ray with the engine, or it hid
-  the gearbox. The camera moved from above the nose to the car's right side, a little above the engine, 1.5 m off, so
-  the back of the engine, the clutch and the gearbox line up across the screen left of the panel, gears side-on; the
-  gearbox spans over a quarter of the screen. That view looks through the raised hood, which is a ghost there, so the
-  hood checks skip it; it gets its own orbit limits (no zooming closer), or swinging back would reach the cabin.
+- **Three views.** "Look inside" became a group of three buttons (`XrayView`: engine, gearbox, both; the store keeps
+  `inside` and `xray`, and `setLook`). Engine is the original x-ray, unchanged: from above the nose, bay solid, no
+  driveline. Gearbox and Both show the driveline with the body and the bay's shell as x-rays. Picking the view shown
+  steps back outside. Phones hide Both (too small to follow there) and the group's caption, so the dock keeps its
+  two rows and the engine's markers stay reachable.
+- **Cameras.** Gearbox: target (0, -0.06, -0.65) in engine space, from (1, 1.4, 0.15) at 1.6 m with a 1.9× lens
+  zoom (camera-controls' `zoomTo`; `Shot.zoom`), so the camera stays outside the body even orbiting (its own orbit
+  limits, no zooming closer) while the clutch-to-1st span fills half the screen width; tilted so the layshaft's
+  gears show beside the output shaft's. Both: from above the front right, (1, 1.5, 0.6) at 2.4 m, the whole engine and
+  the gearbox in view. Both looks through the raised hood, which is a ghost there; the hood checks skip these views.
+- **Live labels** (`GearboxLabels`, gearbox view only): each gear's speed and state (driving, locked with the clutch
+  open, or free), the clutch's state, and the input, layshaft and output shafts' speeds, from `liveShaftSpeeds`
+  (in gear the gearbox turns with the wheels, in neutral with the engine). The locked gear reads the output shaft's
+  speed; the free ones their own, which is the point. Even gears' labels sit above the gearbox and odd gears' below,
+  on short stems, so neighbours never overlap; they redraw at about 8 Hz so the numbers can be read. While a change
+  replays they show the replayed change (the revs before it until the new ring is in, then after), not the live
+  engine. Phones show only the gear names.
 - **The clutch pack is seven parts.** `Clutch_disc_1..3` (carbon, turning with the input shaft) and
   `Clutch_plate_1..4` (steel, turning with the flywheel), front to back, each with `extras.spread`: how far it slides
   back wide open, 4 mm more per gap, 24 mm for the pressure plate. Real clutches move about a millimetre; the panel says
-  it is drawn wider. The flywheel keeps the face and longer bolts. Without a replay the pack sits shut in gear and open
-  in neutral, as the crate's automatic clutch is.
+  it is drawn wider. Without a replay the pack sits shut in gear and open in neutral, as the crate's automatic clutch is.
 - **The replay** (`src/drive/shiftReplay.ts`). A change the x-ray sees is replayed over the crate's shift time × 40
   (4.8 s), in up to four equal steps over the first 90%: the clutch opens (with the spark cut going up, the throttle
   blip going down), the old gear's dog ring slides to the middle, the new gear's slides in, the clutch closes. From
   neutral there is no opening or sliding out; into neutral, no sliding in or closing. 1st and 2nd share a ring, which
   slides right across. The parts a step moves glow cyan; the drive's path stays orange, dimmed by how far the clutch
   is open, and moves to the new gear once its ring is in. The live engine, sound and gauges carry on at full speed;
-  the revs either side of the change are read 0.24 s after it (twice the shift time) for the last step's sentence.
-  A new change restarts the replay.
-- **The panel** lists the steps (`ShiftSteps`): done, under way (lit, with a sentence), to come; once played, all done
-  with the revs. It sits in both x-ray panels, above the firing order and the gear chart. Outside the x-ray, in gear
-  with the hood open, the dock says to look inside.
+  the revs either side are read 0.24 s after the change (twice the shift time). A new change restarts the replay. The
+  panel (`ShiftSteps`, in the gearbox views' "How the gearbox works" and the drivetrain hotspot's panel) lists the
+  steps as they play. With the hood open in gear, outside the gearbox views, the dock says to look inside the gearbox.
 - **Budget.** The work took the JavaScript to 451 KB gzip. drei's `<Environment>` was replaced by `StudioEnvironment`,
   which renders the same Lightformers once into the same 256 px half-float cube map without drei's HDR, EXR and
-  gain-map loaders; the showroom renders identically (only the drifting dust differs) and the total fell to 434 KB.
+  gain-map loaders; the showroom renders identically (only the drifting dust differs) and the total fell to 434 KB
+  (436 KB with the views and labels).

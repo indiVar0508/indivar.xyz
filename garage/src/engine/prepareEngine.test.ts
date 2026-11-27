@@ -83,7 +83,7 @@ describe('the engine’s moving parts', () => {
 });
 
 describe('setXray', () => {
-  it('turns the engine and its bay into shadowless ghosts, so the gearbox behind shows, brightest on the selected part, and back', () => {
+  it('turns the engine, not the bay, into a shadowless ghost, brightest on the selected part, and back', () => {
     const { root } = fakeEngine();
     const rig = prepareEngine(root);
     const solid = materialOf(rig.parts.heads);
@@ -95,13 +95,22 @@ describe('setXray', () => {
     expect(rig.parts.heads.children[0]!.castShadow).toBe(false);
     const edge = (id: keyof typeof rig.parts) => ((rig.parts[id].children[0] as Mesh).material as ShaderMaterial).uniforms.edge!.value as number;
     expect(edge('heads')).toBeGreaterThan(edge('layout'));
-    expect((rig.bay.children[0] as Mesh).material).toBeInstanceOf(ShaderMaterial);
-    expect(rig.bay.children[0]!.castShadow).toBe(false);
+    expect((rig.bay.children[0] as Mesh).material).toBe(bay);
     setXray(rig, true, 'layout');
     expect(edge('layout')).toBeGreaterThan(edge('heads'));
     setXray(rig, false, null);
     expect(materialOf(rig.parts.heads)).toBe(solid);
     expect(rig.parts.heads.children[0]!.castShadow).toBe(true);
+  });
+
+  it('turns the bay into a ghost too when asked, so the gearbox behind it shows, and back', () => {
+    const { root } = fakeEngine();
+    const rig = prepareEngine(root);
+    const bay = (rig.bay.children[0] as Mesh).material;
+    setXray(rig, true, null, true);
+    expect((rig.bay.children[0] as Mesh).material).toBeInstanceOf(ShaderMaterial);
+    expect(rig.bay.children[0]!.castShadow).toBe(false);
+    setXray(rig, true, null, false);
     expect((rig.bay.children[0] as Mesh).material).toBe(bay);
   });
 });

@@ -3,7 +3,7 @@ import { useGarage } from './store';
 import { SHOWROOM } from './view';
 
 describe('useGarage', () => {
-  beforeEach(() => useGarage.setState({ view: SHOWROOM, quality: 'high', ready: false, soundOn: false, ownTrack: null, trackError: null, inside: false, turbo: false }));
+  beforeEach(() => useGarage.setState({ view: SHOWROOM, quality: 'high', ready: false, soundOn: false, ownTrack: null, trackError: null, inside: false, xray: 'engine', turbo: false }));
 
   it('routes view actions through the reducer', () => {
     useGarage.getState().dispatch({ type: 'select-car', id: 'hood' });
@@ -27,6 +27,23 @@ describe('useGarage', () => {
     s.dispatch({ type: 'select-part', id: 'crank' });
     expect(useGarage.getState().inside).toBe(true);
     s.dispatch({ type: 'close-hood' });
+    expect(useGarage.getState().inside).toBe(false);
+  });
+
+  it('looks inside the engine, the gearbox or both, only with the hood open, and remembers which', () => {
+    const s = useGarage.getState();
+    s.dispatch({ type: 'select-car', id: 'hood' });
+    expect(useGarage.getState().xray).toBe('engine');
+    s.setLook('gearbox');
+    expect(useGarage.getState()).toMatchObject({ inside: true, xray: 'gearbox' });
+    s.setLook('both');
+    expect(useGarage.getState()).toMatchObject({ inside: true, xray: 'both' });
+    s.setLook(null);
+    expect(useGarage.getState().inside).toBe(false);
+    s.setInside(true);
+    expect(useGarage.getState().xray).toBe('both');
+    s.dispatch({ type: 'close-hood' });
+    s.setLook('gearbox');
     expect(useGarage.getState().inside).toBe(false);
   });
 

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { instantiateP60, P60_CONSTANT, readGearbox } from '../engine/p60';
-import { DriveSpin, dogOffset, gearLabel, gearStrip, kmh, ordinal, overallRatio, refusalNote, speedAt, wheelTorque, type Gearbox } from './gears';
+import { DriveSpin, dogOffset, gearboxRatio, gearLabel, gearStrip, kmh, liveShaftSpeeds, ordinal, overallRatio, refusalNote, shaftSpeeds, speedAt, wheelTorque, type Gearbox } from './gears';
 
 let box: Gearbox;
 let limit: number;
@@ -94,5 +94,28 @@ describe('DriveSpin', () => {
   it('slides each dog ring toward its engaged gear', () => {
     expect([0, 1, 2, 3].map((gear) => dogOffset(0, gear))).toEqual([0, -1, 1, 0]);
     expect(dogOffset(2, 6)).toBe(1);
+  });
+});
+
+describe('shaftSpeeds', () => {
+  it('in gear, turns the gearbox with the output shaft: the engaged gear at its speed, the free ones at their own', () => {
+    const output = 2442;
+    const s = shaftSpeeds(box, { input: output * gearboxRatio(box, 1), output });
+    expect(s.gears[0]).toBeCloseTo(output, 6);
+    expect(s.gears[1]).toBeGreaterThan(output);
+    expect(s.gears[5]).toBeGreaterThan(s.gears[4]!);
+    expect(s.layshaft).toBeCloseTo(s.input * (23 / 31), 6);
+  });
+
+  it('reads the shafts from the engine and the wheels as the gearbox reports them', () => {
+    const wheel = 66.5; // rad/s at the rear wheels
+    const output = (wheel * (50 / 13) * 60) / (2 * Math.PI);
+    const inGear = liveShaftSpeeds(box, { rpm: 5800, gear: 2, wheel });
+    expect(inGear.output).toBeCloseTo(output, 3);
+    expect(inGear.input).toBeCloseTo(output * gearboxRatio(box, 2), 3);
+    expect(inGear.gears[1]).toBeCloseTo(output, 3);
+    const neutral = liveShaftSpeeds(box, { rpm: 1500, gear: 0, wheel: 0 });
+    expect(neutral.input).toBe(1500);
+    expect(neutral.output).toBe(0);
   });
 });

@@ -13,6 +13,7 @@ export function CameraRig({ bay }: { bay: Vec3 }) {
   const controls = useRef<ComponentRef<typeof CameraControls>>(null);
   const view = useGarage((state) => state.view);
   const inside = useGarage((state) => state.inside);
+  const xray = useGarage((state) => state.xray);
   const reducedMotion = useGarage((state) => state.reducedMotion);
   const camera = useThree((state) => state.camera);
   const size = useThree((state) => state.size);
@@ -34,8 +35,8 @@ export function CameraRig({ bay }: { bay: Vec3 }) {
   useEffect(() => {
     const rig = controls.current;
     if (!rig) return;
-    const shot = shotFor(view, bay, inside);
-    const limits = orbitLimits(view, shot, inside);
+    const shot = shotFor(view, bay, inside, xray);
+    const limits = orbitLimits(view, shot, inside, xray);
     rig.minAzimuthAngle = limits.minAzimuth;
     rig.maxAzimuthAngle = limits.maxAzimuth;
     rig.minPolarAngle = limits.minPolar;
@@ -44,9 +45,10 @@ export function CameraRig({ bay }: { bay: Vec3 }) {
     rig.maxDistance = limits.maxDistance;
     const { position: p, target: t } = shot;
     void rig.setLookAt(p[0], p[1], p[2], t[0], t[1], t[2], !reducedMotion);
+    void rig.zoomTo(shot.zoom ?? 1, !reducedMotion);
     rig.normalizeRotations(); // after a long drift, turn the short way round to the new shot
     timer.idle = 0;
-  }, [view, bay, inside, reducedMotion]);
+  }, [view, bay, inside, xray, reducedMotion]);
 
   useEffect(() => {
     const rig = controls.current;
