@@ -66,15 +66,18 @@ export function engineShot(origin: Vec3, id: EngineTopicId): Shot {
   return { position: add(target, scale(direction, ENGINE_VIEW_DISTANCE)), target };
 }
 
-/** Looking inside: the whole engine, from above the nose, so all eight cylinders show through the x-ray. */
-const INSIDE_TARGET: Vec3 = [0, 0.16, 0.02];
-const INSIDE_DIRECTION: Vec3 = [0.35, 1, 0.25];
-const INSIDE_DISTANCE = 2.0;
+/**
+ * Looking inside: from the car's right, a little above the engine, so the back of the engine, the clutch behind it and
+ * the gearbox line up across the screen through the x-ray, left of the panel, with the gears side-on, big enough to
+ * watch a gear change.
+ */
+const INSIDE_TARGET: Vec3 = [0, 0.2, -0.5];
+const INSIDE_DIRECTION: Vec3 = [1, 0.5, 0];
+const INSIDE_DISTANCE = 1.5;
 
 export function insideShot(origin: Vec3): Shot {
   const target = add(origin, INSIDE_TARGET);
-  const direction = normalize(add(normalize(INSIDE_DIRECTION), ENGINE_VIEW_BIAS));
-  return { position: add(target, scale(direction, INSIDE_DISTANCE)), target };
+  return { position: add(target, scale(normalize(INSIDE_DIRECTION), INSIDE_DISTANCE)), target };
 }
 
 /** The camera shot for a view. Looking inside changes only the bay's overview; part views keep their own. */
@@ -134,6 +137,8 @@ const ORBIT_FREEDOM = {
   focus: { azimuth: 0.5, up: 0.3, down: 0.3, nearer: 0.75, farther: 1.5 },
   bay: { azimuth: 0.4, up: 0.25, down: 0.15, nearer: 0.8, farther: 1.4 },
   'bay-part': { azimuth: 0.3, up: 0.06, down: 0, nearer: 1, farther: 1.3 },
+  // Looking inside from beside the car: no closer, or swinging back it would reach the cabin.
+  inside: { azimuth: 0.4, up: 0.25, down: 0.15, nearer: 1, farther: 1.4 },
 } as const;
 
 /**
@@ -141,9 +146,9 @@ const ORBIT_FREEDOM = {
  * which keeps the camera outside the car; every other view keeps the camera near its shot, so it can't swing
  * through the body or the open hood. The room itself is enforced separately with CAMERA_BOUNDS.
  */
-export function orbitLimits(view: View, shot: Shot): OrbitLimits {
+export function orbitLimits(view: View, shot: Shot, inside = false): OrbitLimits {
   if (view.kind === 'showroom') return { minAzimuth: -Infinity, maxAzimuth: Infinity, minPolar: 0.35, maxPolar: 1.45, minDistance: 3, maxDistance: 7.5 };
-  const freedom = ORBIT_FREEDOM[view.kind];
+  const freedom = ORBIT_FREEDOM[inside && view.kind === 'bay' ? 'inside' : view.kind];
   const offset = sub(shot.position, shot.target);
   const distance = length(offset);
   const azimuth = Math.atan2(offset[0], offset[2]);

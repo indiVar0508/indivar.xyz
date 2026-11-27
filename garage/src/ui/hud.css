@@ -108,6 +108,17 @@ body:has(.radio) .engine-dock { max-width: calc(100% - 436px); }
 .label-short { display: none; }
 .engine-note { flex-basis: 100%; margin: 0; font: 11px/1.4 var(--mono); color: var(--amber); text-align: right; }
 .engine-note:empty { display: none; }
+.shift { margin: 0 0 14px; }
+.shift figcaption { font: 11px/1.4 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.shift ol { display: grid; gap: 4px; margin: 6px 0 0; padding: 0; list-style: none; counter-reset: shift; }
+.shift li { display: grid; gap: 4px; padding: 6px 8px; border: 1px solid var(--line); color: var(--muted); counter-increment: shift; transition: background 0.15s, color 0.15s, border-color 0.15s; }
+.shift-title { font: 600 14px/1.2 var(--font); }
+.shift-title::before { content: counter(shift) '  '; font-family: var(--mono); color: var(--muted); }
+.shift li.is-done { color: var(--silver); }
+.shift li.is-now { border-color: #7fd4ff; background: rgba(127, 212, 255, 0.14); color: var(--silver); }
+.shift li.is-now .shift-title::before { color: #7fd4ff; }
+.shift-text { font: 13px/1.45 var(--font); color: var(--silver); }
+.shift .shift-note { margin: 6px 0 0; font: 11px/1.4 var(--mono); color: var(--amber); }
 .firing { margin: 0 0 14px; }
 .firing figcaption, .firing p { font: 11px/1.4 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
 .firing p { margin: 6px 0 0; letter-spacing: 0; text-transform: none; }
@@ -118,7 +129,7 @@ body:has(.radio) .engine-dock { max-width: calc(100% - 436px); }
 .firing li.is-firing { background: rgba(255, 140, 50, 0.85); color: #07090c; }
 .firing .firing-note { color: var(--amber); }
 @media (prefers-reduced-motion: reduce) {
-  .firing li { transition: none; }
+  .firing li, .shift li { transition: none; }
 }
 @media (max-width: 720px) {
   /* Phones: the engine controls flow in among the HUD buttons, above the bottom sheet, and every button gets more

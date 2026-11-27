@@ -10,7 +10,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { ENGINE_OFFSET } from '../engine/anchors';
 import { instantiateP60, readGearbox } from '../engine/p60';
 import type { Gearbox } from './gears';
-import { ROLLER_NODES } from './manifest';
+import { CLUTCH_NODES, ROLLER_NODES } from './manifest';
 
 const MODELS = resolve(import.meta.dirname, '../../public/models');
 let drive: Map<string, Node>;
@@ -52,6 +52,24 @@ describe('drivetrain.glb', () => {
       expect(pivot.y, name).toBeCloseTo(crank.y, 3);
     }
     expect(at(drive, 'Layshaft').y).toBeLessThan(crank.y - 0.05);
+  });
+
+  it('stacks the clutch pack behind the flywheel, on the crank’s axis, and opens it clear of the gears', () => {
+    const flywheel = at(drive, 'Flywheel');
+    const pack = CLUTCH_NODES.map((name) => ({ name, z: at(drive, name).z, spread: drive.get(name)!.getExtras().spread as number }));
+    for (const { name, z } of pack) {
+      expect(at(drive, name).y, name).toBeCloseTo(flywheel.y, 3);
+      expect(z, name).toBeLessThan(flywheel.z);
+    }
+    for (let k = 1; k < pack.length; k++) {
+      expect(pack[k]!.z, pack[k]!.name).toBeLessThan(pack[k - 1]!.z);
+      expect(pack[k]!.spread, pack[k]!.name).toBeGreaterThanOrEqual(pack[k - 1]!.spread);
+    }
+    // Wide open, the pressure plate stays well in front of the constant-mesh gear (the front of the gear cluster).
+    const gear = vertices('Input').filter((v) => Math.hypot(v.x - flywheel.x, v.y - flywheel.y) > 0.02);
+    const constantMesh = Math.max(...gear.map((v) => v.z));
+    const back = pack.at(-1)!;
+    expect(back.z - back.spread - 0.01).toBeGreaterThan(constantMesh + 0.03);
   });
 
   it('turns the axle about the rear wheels’ own axis', () => {

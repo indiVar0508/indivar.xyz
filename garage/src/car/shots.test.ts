@@ -26,8 +26,8 @@ describe('camera shots', () => {
     }
   });
 
-  it('never looks at the engine through the open hood', () => {
-    const bayShots = [['bay', CAR_SHOTS.bay] as const, ...engineShots];
+  it('never looks at the engine through the open hood, except in the x-ray, where the hood is a ghost too', () => {
+    const bayShots = [['bay', CAR_SHOTS.bay] as const, ...engineShots.filter(([id]) => id !== 'inside')];
     for (const [id, shot] of bayShots) expect(segmentHitsHood(shot.position, shot.target, HOOD_PANEL, open), id).toBe(false);
   });
 
@@ -98,16 +98,26 @@ describe('camera shots', () => {
     }
   });
 
-  it('frames the whole engine when looking inside', () => {
+  it('looks inside from the side, so the back of the engine, its clutch and the gearbox fill the screen clear of the panel and the dock', () => {
+    // Engine space: the flywheel, back to 1st gear, and the rear of the engine from its sump to its heads.
+    const flywheel: Vec3 = [0, 0, -0.3];
+    const first: Vec3 = [0, 0, -0.78];
+    const points: Vec3[] = [flywheel, first, [0, 0.55, -0.25], [0, -0.12, -0.25], [0, 0, 0.15], [0, 0.55, 0.1]];
     const { position, target } = insideShot(origin);
-    const camera = new PerspectiveCamera(CAMERA_FOV, 16 / 9, 0.05, 60);
-    camera.position.set(...position);
-    camera.lookAt(...target);
-    camera.updateMatrixWorld();
-    for (const x of [-0.42, 0.42]) for (const y of [-0.12, 0.6]) for (const z of [-0.3, 0.42]) {
-      const ndc = new Vector3(...add(origin, [x, y, z])).project(camera);
-      expect(Math.abs(ndc.x)).toBeLessThan(0.95);
-      expect(Math.abs(ndc.y)).toBeLessThan(0.95);
+    for (const aspect of [1.6, 16 / 9]) {
+      const camera = new PerspectiveCamera(fovFor(aspect), aspect, 0.05, 60);
+      camera.position.set(...position);
+      camera.lookAt(...target);
+      camera.updateMatrixWorld();
+      const ndc = (point: Vec3) => new Vector3(...add(origin, point)).project(camera);
+      for (const point of points) {
+        expect(ndc(point).x, `${point} at ${aspect}`).toBeGreaterThan(-0.92);
+        expect(ndc(point).x, `${point} at ${aspect}`).toBeLessThan(0.4);
+        expect(ndc(point).y, `${point} at ${aspect}`).toBeGreaterThan(-0.65);
+        expect(ndc(point).y, `${point} at ${aspect}`).toBeLessThan(0.85);
+      }
+      // Big enough to watch a dog ring's 9 mm slide: the gearbox spans over a quarter of the screen's width.
+      expect(ndc(flywheel).distanceTo(ndc(first)), `at ${aspect}`).toBeGreaterThan(0.5);
     }
   });
 });
@@ -145,10 +155,10 @@ describe('orbit limits', () => {
   ].map((view) => [view, false] as [View, boolean]);
   views.push([{ kind: 'bay' }, true]);
 
-  it('never lets the visitor orbit or zoom the camera into the car, or through the open hood', () => {
+  it('never lets the visitor orbit or zoom the camera into the car, or through the open hood unless it is an x-ray', () => {
     for (const [view, inside] of views) {
       const shot = shotFor(view, EXPECTED_BAY, inside);
-      const limits = orbitLimits(view, shot);
+      const limits = orbitLimits(view, shot, inside);
       const azimuths = Number.isFinite(limits.minAzimuth)
         ? [limits.minAzimuth, (limits.minAzimuth + limits.maxAzimuth) / 2, limits.maxAzimuth]
         : Array.from({ length: 24 }, (_, i) => (i / 24) * 2 * Math.PI);
@@ -158,7 +168,7 @@ describe('orbit limits', () => {
             const camera = orbitPosition(shot.target, azimuth, polar, distance);
             const label = `${JSON.stringify(view)} az ${azimuth.toFixed(2)} pol ${polar.toFixed(2)} d ${distance.toFixed(2)} → ${camera.map((v) => v.toFixed(2))}`;
             expect(insideSolid(camera), label).toBe(false);
-            if (isHoodOpen(view)) expect(segmentHitsHood(camera, shot.target, HOOD_PANEL, open), label).toBe(false);
+            if (isHoodOpen(view) && !inside) expect(segmentHitsHood(camera, shot.target, HOOD_PANEL, open), label).toBe(false);
           }
         }
       }
@@ -168,7 +178,7 @@ describe('orbit limits', () => {
   it('includes each view’s own shot', () => {
     for (const [view, inside] of views) {
       const shot = shotFor(view, EXPECTED_BAY, inside);
-      const limits = orbitLimits(view, shot);
+      const limits = orbitLimits(view, shot, inside);
       const [dx, dy, dz] = [0, 1, 2].map((axis) => shot.position[axis]! - shot.target[axis]!) as Vec3;
       const distance = Math.hypot(dx, dy, dz);
       const azimuth = Math.atan2(dx, dz);

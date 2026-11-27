@@ -35,7 +35,7 @@ export function CameraRig({ bay }: { bay: Vec3 }) {
     const rig = controls.current;
     if (!rig) return;
     const shot = shotFor(view, bay, inside);
-    const limits = orbitLimits(view, shot);
+    const limits = orbitLimits(view, shot, inside);
     rig.minAzimuthAngle = limits.minAzimuth;
     rig.maxAzimuthAngle = limits.maxAzimuth;
     rig.minPolarAngle = limits.minPolar;

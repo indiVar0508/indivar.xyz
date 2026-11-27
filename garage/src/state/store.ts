@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { EngineStatus } from '../audio/engineSound';
+import type { Change, ReplayStep } from '../drive/shiftReplay';
 import type { RadioState } from '../music/radio';
 import { FORCED_QUALITY } from '../qa';
 import { initialQuality, readDeviceHints, type Quality } from './quality';
@@ -32,6 +33,8 @@ export type GarageStore = {
   gear: number;
   /** Why the gearbox refused the last change, until the next one. */
   driveNote: string | null;
+  /** The last gear change the x-ray replayed, and the step it is on (null once it has played), while the x-ray shows. */
+  replay: { change: Change; step: ReplayStep | null } | null;
   dispatch: (action: ViewAction) => void;
   setQuality: (quality: Quality) => void;
   setReady: () => void;
@@ -47,6 +50,7 @@ export type GarageStore = {
   setInside: (inside: boolean) => void;
   setTurbo: (fitted: boolean) => void;
   setGear: (gear: number) => void;
+  setReplay: (replay: GarageStore['replay']) => void;
   setDriveNote: (note: string | null) => void;
 };
 
@@ -72,6 +76,7 @@ export const useGarage = create<GarageStore>()((set) => ({
   turbo: false,
   gear: 0,
   driveNote: null,
+  replay: null,
   dispatch: (action) =>
     set((state) => {
       const view = reduceView(state.view, action);
@@ -93,4 +98,5 @@ export const useGarage = create<GarageStore>()((set) => ({
   setTurbo: (turbo) => set({ turbo }),
   setGear: (gear) => set({ gear, driveNote: null }),
   setDriveNote: (driveNote) => set({ driveNote }),
+  setReplay: (replay) => set({ replay }),
 }));

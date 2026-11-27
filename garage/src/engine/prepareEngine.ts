@@ -11,6 +11,8 @@ export type EngineRig = {
   materials: Record<PartId, MeshStandardMaterial[]>;
   /** One x-ray material per part, so the selected part's can be brighter. */
   ghosts: Record<PartId, ShaderMaterial>;
+  /** The bay's x-ray material. */
+  bayGhost: ShaderMaterial;
   /** The belt drive's pulleys, each with its speed relative to the crank. */
   spins: { node: Object3D; ratio: number }[];
   /** Throttle butterflies for cylinders 1–8, with the side of the engine each sits on (-1 right, 1 left). */
@@ -90,6 +92,7 @@ export function prepareEngine(root: Object3D): EngineRig {
     parts,
     materials,
     ghosts,
+    bayGhost: ghostMaterial(),
     spins: SPIN_NODES.map((name) => ({ node: named(name), ratio: crankRadius / (named(name).userData.radius as number) })),
     throttles: cylinders.map((n) => ({ node: named(`Throttle_${n}`), side: Math.sign(named(`Throttle_${n}`).position.x) })),
     injectors: cylinders.map((n) => named(`Injector_${n}`).position.clone()),
@@ -141,17 +144,21 @@ void main() {
 }
 
 /**
- * Shows the engine as an x-ray (or puts it back), so the moving parts inside show through. The bay stays solid.
- * The engine stops casting shadows meanwhile, or it would still darken the parts inside.
+ * Shows the engine as an x-ray (or puts it back), so the moving parts inside show through, and its bay too, so the
+ * clutch and gearbox behind it show. Both stop casting shadows meanwhile, or they would still darken the parts inside.
  */
 export function setXray(rig: EngineRig, on: boolean, selected: EngineTopicId | null): void {
-  for (const id of ENGINE_PARTS) {
-    rig.ghosts[id].uniforms.edge!.value = id === selected ? GHOST_SELECTED_EDGE : GHOST_EDGE;
-    rig.parts[id].traverse((object) => {
+  const ghost = (root: Object3D, material: ShaderMaterial) =>
+    root.traverse((object) => {
       if (!(object instanceof Mesh)) return;
       object.userData.solid ??= object.material;
-      object.material = on ? rig.ghosts[id] : object.userData.solid;
-      object.castShadow = !on;
+      object.userData.shadow ??= object.castShadow;
+      object.material = on ? material : object.userData.solid;
+      object.castShadow = on ? false : object.userData.shadow;
     });
+  for (const id of ENGINE_PARTS) {
+    rig.ghosts[id].uniforms.edge!.value = id === selected ? GHOST_SELECTED_EDGE : GHOST_EDGE;
+    ghost(rig.parts[id], rig.ghosts[id]);
   }
+  ghost(rig.bay, rig.bayGhost);
 }

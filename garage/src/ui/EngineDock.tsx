@@ -173,7 +173,10 @@ export function EngineDock() {
   const inside = useGarage((state) => state.inside);
   const turbo = useGarage((state) => state.turbo);
   const driveNote = useGarage((state) => state.driveNote);
+  // With the hood open, outside the x-ray, the clutch and gearbox are hidden behind the engine.
+  const inGear = useGarage((state) => state.gear > 0 && isHoodOpen(state.view));
   const stopped = engine === 'off' || engine === 'stopping';
+  const hint = turbo ? 'Game turbo kit fitted. It’s only in Most Wanted: the real P60B40 has no turbo.' : inGear && !inside ? 'Look inside to watch the clutch and gearbox change gear.' : '';
   return (
     <section className="engine-dock" aria-label="Engine">
       {stopped ? (
@@ -199,7 +202,7 @@ export function EngineDock() {
         <Label long="Game turbo" short="Turbo" />
       </button>
       <p className="engine-note" role="status">
-        {error ?? driveNote ?? (turbo ? 'Game turbo kit fitted. It’s only in Most Wanted: the real P60B40 has no turbo.' : '')}
+        {error ?? driveNote ?? hint}
       </p>
     </section>
   );

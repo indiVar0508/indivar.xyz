@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DRIVE_NODES, driveAssetErrors, type DriveAssetFacts } from './manifest';
+import { CLUTCH_NODES, DRIVE_NODES, driveAssetErrors, type DriveAssetFacts } from './manifest';
 
 const good: DriveAssetFacts = {
   nodeNames: [...DRIVE_NODES, 'Case_gearbox'],
@@ -8,6 +8,7 @@ const good: DriveAssetFacts = {
   pivotsWithMeshes: [],
   dogTravel: { Dog_12: 0.009, Dog_34: 0.009, Dog_56: 0.009 },
   rollerRadii: { Roller_RL_front: 0.11, Roller_RL_rear: 0.11, Roller_RR_front: 0.11, Roller_RR_rear: 0.11 },
+  clutchSpread: Object.fromEntries(CLUTCH_NODES.map((name, k) => [name, 0.004 * (k + 1)])),
 };
 
 describe('drivetrain asset contract', () => {
@@ -17,6 +18,11 @@ describe('drivetrain asset contract', () => {
     expect(DRIVE_NODES.filter((name) => /^Lay_\d$/.test(name))).toHaveLength(6);
     expect(DRIVE_NODES.filter((name) => /^Dog_/.test(name))).toEqual(['Dog_12', 'Dog_34', 'Dog_56']);
     expect(DRIVE_NODES.filter((name) => /^Roller_/.test(name))).toHaveLength(4);
+  });
+
+  it('splits the clutch pack into its three carbon discs and the steel plates between them, front to back', () => {
+    expect(CLUTCH_NODES).toEqual(['Clutch_disc_1', 'Clutch_plate_1', 'Clutch_disc_2', 'Clutch_plate_2', 'Clutch_disc_3', 'Clutch_plate_3', 'Clutch_plate_4']);
+    expect(DRIVE_NODES).toEqual(expect.arrayContaining([...CLUTCH_NODES]));
   });
 
   it('accepts a complete drivetrain inside its budget', () => {
@@ -33,6 +39,7 @@ describe('drivetrain asset contract', () => {
         pivotsWithMeshes: ['Axle'],
         dogTravel: { ...good.dogTravel, Dog_34: undefined },
         rollerRadii: { ...good.rollerRadii, Roller_RR_rear: 0 },
+        clutchSpread: { ...good.clutchSpread, Clutch_disc_2: undefined },
       }),
     ).toEqual([
       'missing node: Gear_3',
@@ -41,6 +48,7 @@ describe('drivetrain asset contract', () => {
       'Axle holds its mesh directly; quantization would move its pivot',
       'Dog_34 has no travel in its extras',
       'Roller_RR_rear has no radius in its extras',
+      'Clutch_disc_2 has no spread in its extras',
     ]);
   });
 });

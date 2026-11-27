@@ -8,7 +8,7 @@ import { getBounds, NodeIO, type Document, type Node } from '@gltf-transform/cor
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
 import { MeshoptDecoder } from 'meshoptimizer';
 import { assetErrors, WHEEL_NODES } from '../src/car/manifest.ts';
-import { DOG_NODES, DRIVE_PIVOTS, driveAssetErrors, ROLLER_NODES } from '../src/drive/manifest.ts';
+import { CLUTCH_NODES, DOG_NODES, DRIVE_PIVOTS, driveAssetErrors, ROLLER_NODES } from '../src/drive/manifest.ts';
 import { ENGINE_PARTS, engineAssetErrors, INTERNALS_NODES, internalsAssetErrors, partNode, turboAssetErrors, type Box } from '../src/engine/manifest.ts';
 import type { Vec3 } from '../src/math.ts';
 
@@ -111,6 +111,7 @@ const drivetrain = await check('drivetrain.glb', (document, bytes) => {
     pivotsWithMeshes: nodes.filter((node) => DRIVE_PIVOTS.includes(node.getName()) && node.getMesh()).map((node) => node.getName()),
     dogTravel: extra(DOG_NODES, 'travel'),
     rollerRadii: extra(ROLLER_NODES, 'radius'),
+    clutchSpread: extra(CLUTCH_NODES, 'spread'),
   });
 });
 
