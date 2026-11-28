@@ -63,7 +63,7 @@ const pistons = (page: Page) => page.evaluate(() => (window as unknown as { gara
 
 test('looks inside: x-ray, moving parts, firing order', async ({ page }, info) => {
   const errors = await open(page);
-  await page.getByRole('button', { name: 'Look inside' }).click();
+  await page.getByRole('button', { name: 'Look inside the engine' }).click();
   await expect(page.getByRole('heading', { level: 2, name: 'How it runs' })).toBeVisible();
   await expect(page.getByText('Start the engine to see it run.')).toBeVisible();
   await expect.poll(() => pistons(page), { timeout: 30_000 }).not.toBeNull();
@@ -82,10 +82,12 @@ test('looks inside: x-ray, moving parts, firing order', async ({ page }, info) =
   await expect(page.locator('.firing li.is-firing')).toHaveCount(1);
   await page.screenshot({ path: info.outputPath('inside-running.png') });
 
-  await page.getByRole('button', { name: 'Look inside' }).click();
+  // The engine view shows the engine alone: the gearbox stays hidden, as before there was a gearbox view.
+  expect((await drive(page)).driveline).toBe(false);
+  await page.getByRole('button', { name: 'Look inside the engine' }).click();
   expect(await state(page, 'inside')).toBe(false);
   await expect(page.getByRole('heading', { level: 2, name: 'P60B40 V8' })).toBeVisible();
-  await page.getByRole('button', { name: 'Look inside' }).click();
+  await page.getByRole('button', { name: 'Look inside the engine' }).click();
   await page.keyboard.press('Escape');
   expect(await state(page, 'inside')).toBe(false);
   expect(errors).toEqual([]);
@@ -98,7 +100,7 @@ test('keeps the engine controls clear of the radio player and the panel', async 
   await page.getByRole('button', { name: 'Most Wanted radio' }).click();
   await page.getByRole('button', { name: 'Start engine' }).click();
   await expect(page.getByRole('button', { name: 'Hold to rev' })).toBeVisible({ timeout: 20_000 });
-  const controls = [page.locator('.tach'), page.locator('.gear-readout'), ...['Stop engine', 'Hold to rev', 'Shift down', 'Shift up', 'Look inside'].map((name) => page.getByRole('button', { name }))];
+  const controls = [page.locator('.tach'), page.locator('.gear-readout'), ...['Stop engine', 'Hold to rev', 'Shift down', 'Shift up', 'Look inside the engine', 'Look inside the gearbox'].map((name) => page.getByRole('button', { name }))];
   for (const control of controls) {
     const box = (await control.boundingBox())!;
     for (const selector of ['.radio-player', '.panel']) {
@@ -107,11 +109,11 @@ test('keeps the engine controls clear of the radio player and the panel', async 
       expect(overlaps, `${await control.textContent()} over ${selector}`).toBe(false);
     }
   }
-  for (const name of ['Stop engine', 'Hold to rev', 'Look inside']) {
+  for (const [name, text] of [['Stop engine', 'Stop engine'], ['Hold to rev', 'Hold to rev'], ['Look inside the gearbox', 'Gearbox']] as const) {
     const button = page.getByRole('button', { name });
     const box = (await button.boundingBox())!;
     const hit = await page.evaluate(([x, y]) => document.elementFromPoint(x!, y!)?.closest('button')?.textContent ?? null, [box.x + box.width / 2, box.y + box.height / 2]);
-    expect(hit, name).toContain(name === 'Hold to rev' ? 'Hold to rev' : name);
+    expect(hit, name).toContain(text);
   }
   expect(errors).toEqual([]);
 });
@@ -127,7 +129,7 @@ test('turns the belt drive and shows fuel, spark, air, exhaust, oil and coolant 
   await page.waitForTimeout(300);
   const later = (await probe(page, 'garageBelt')) as number[];
   later.forEach((angle, i) => expect(angle, `pulley ${i}`).not.toBe(belt[i]));
-  await page.getByRole('button', { name: 'Look inside' }).click();
+  await page.getByRole('button', { name: 'Look inside the engine' }).click();
   await expect.poll(() => probe(page, 'garageFlows'), { timeout: 30_000 }).toBeGreaterThan(30);
   await page.waitForTimeout(1500);
   await page.screenshot({ path: info.outputPath('inside-flows.png') });
@@ -147,7 +149,7 @@ test('fits the game turbo kit: labelled, spooling with revs, and off again', asy
   expect(boost).toBeGreaterThan(0.4);
   await page.screenshot({ path: info.outputPath('turbo.png') });
   await page.mouse.up();
-  await page.getByRole('button', { name: 'Look inside' }).click();
+  await page.getByRole('button', { name: 'Look inside the engine' }).click();
   await page.waitForTimeout(1500);
   await page.screenshot({ path: info.outputPath('turbo-inside.png') });
   await page.getByRole('button', { name: 'Game turbo' }).click();
@@ -155,7 +157,7 @@ test('fits the game turbo kit: labelled, spooling with revs, and off again', asy
   expect(errors).toEqual([]);
 });
 
-type DriveWindow = { garageDrive(): { wheels: number[]; rollers: number[]; dogs: number[]; driveline: boolean } };
+type DriveWindow = { garageDrive(): { wheels: number[]; rollers: number[]; dogs: number[]; clutch: number[]; driveline: boolean } };
 const drive = (page: Page) => page.evaluate(() => (window as unknown as DriveWindow).garageDrive());
 const live = (page: Page, key: string) => page.evaluate((k) => (window as unknown as { garageEngine: Record<string, number> }).garageEngine[k]!, key);
 
@@ -192,5 +194,133 @@ test('changes gear and drives the rear wheels on the rollers, and shows the driv
   }
   await expect.poll(() => state(page, 'gear'), { timeout: 5_000 }).toBe(6);
   await expect(page.locator('.engine-note')).toHaveText('6th is the top gear.');
+  expect(errors).toEqual([]);
+});
+
+type MountWindow = { garageMount(): number; garageBelt(): number[] };
+
+/** Over `ms`, sampled every frame: the most the engine leans (degrees) and the crank pulley's mean speed (°/s). */
+const watch = (page: Page, ms: number) =>
+  page.evaluate(
+    (ms) =>
+      new Promise<{ lean: number; belt: number }>((done) => {
+        const w = window as unknown as MountWindow;
+        let [lean, turned, last] = [0, 0, w.garageBelt()[0]!];
+        const start = performance.now();
+        const tick = (now: number) => {
+          lean = Math.max(lean, Math.abs(w.garageMount()));
+          const angle = w.garageBelt()[0]!;
+          turned += Math.abs(Math.atan2(Math.sin(angle - last), Math.cos(angle - last)));
+          last = angle;
+          if (now - start < ms) requestAnimationFrame(tick);
+          else done({ lean: (lean * 180) / Math.PI, belt: (turned * 180) / Math.PI / ((now - start) / 1000) });
+        };
+        requestAnimationFrame(tick);
+      }),
+    ms,
+  );
+
+test('shows a gear change under the hood: the engine leans harder pulling in gear, and the belts follow the revs', async ({ page }, info) => {
+  const errors = await open(page, '?qa&quality=low');
+  await page.getByRole('button', { name: 'Open the hood' }).click();
+  await page.getByRole('button', { name: 'Start engine' }).click();
+  await expect.poll(() => state(page, 'engine'), { timeout: 20_000 }).toBe('running');
+  await page.waitForTimeout(2500);
+  const idle = await watch(page, 1000);
+
+  await page.keyboard.down('r');
+  const neutral = await watch(page, 1200);
+  await page.keyboard.up('r');
+  await expect.poll(() => rpm(page), { timeout: 10_000 }).toBeLessThan(2500);
+
+  await page.keyboard.press('ArrowUp');
+  await expect.poll(() => state(page, 'gear'), { timeout: 5_000 }).toBe(1);
+  await page.keyboard.down('r');
+  const first = await watch(page, 2000);
+  await page.screenshot({ path: info.outputPath('pulling-in-first.png') });
+  await page.keyboard.up('r');
+
+  expect(first.lean, `1st ${first.lean}° vs neutral ${neutral.lean}°`).toBeGreaterThan(1.5 * neutral.lean);
+  expect(first.lean).toBeGreaterThan(1);
+  expect(neutral.belt, `revving ${neutral.belt}°/s vs idle ${idle.belt}°/s`).toBeGreaterThan(2 * idle.belt);
+  expect(errors).toEqual([]);
+});
+
+type ReplayWindow = { __steps: (string | null)[]; __clutch: number; __dogs: number[]; __driving: string[] };
+
+test('shows the gearbox live, and replays a change: the clutch opens, the ring slides from 1st to 2nd, the clutch closes', async ({ page }, info) => {
+  const errors = await open(page, '?qa&quality=low');
+  await page.getByRole('button', { name: 'Open the hood' }).click();
+  await page.getByRole('button', { name: 'Start engine' }).click();
+  await expect.poll(() => state(page, 'engine'), { timeout: 20_000 }).toBe('running');
+  await page.keyboard.press('ArrowUp');
+  await expect.poll(() => state(page, 'gear'), { timeout: 5_000 }).toBe(1);
+  await expect(page.locator('.engine-note')).toHaveText('Look inside the gearbox to watch it change gear.');
+
+  if (info.project.name === 'desktop') {
+    await page.getByRole('button', { name: 'Look inside both' }).click();
+    await expect.poll(async () => (await drive(page)).driveline).toBe(true);
+    await expect(page.locator('.crumbs')).toContainText('Engine and gearbox');
+    await expect(page.locator('.gearbox-label')).toHaveCount(0);
+  } else {
+    await expect(page.getByRole('button', { name: 'Look inside both' })).toBeHidden(); // too small to follow on a phone
+  }
+
+  await page.getByRole('button', { name: 'Look inside the gearbox' }).click();
+  await expect(page.getByRole('heading', { level: 2, name: 'How the gearbox works' })).toBeVisible();
+  await expect(page.locator('.engine-note')).toHaveText('');
+  // Every gear is labelled with its speed; 1st, the one the dog ring locks, drives the wheels at the output shaft's speed.
+  const gears = page.locator('.gearbox-label.gear');
+  await expect(gears).toHaveCount(6);
+  await expect(page.locator('.gearbox-label.is-driving')).toHaveCount(1);
+  await expect(page.locator('.gearbox-label.is-driving b')).toHaveText('1st');
+  await expect(gears.filter({ hasText: 'free' })).toHaveCount(5);
+  const shift = page.locator('.shift');
+  await expect(shift).toContainText('Change gear to watch the clutch and gearbox do it, slowed 40×.');
+  await expect.poll(async () => (await drive(page)).dogs[0]!, { timeout: 5_000 }).toBeLessThan(-0.008); // in 1st
+  await expect.poll(async () => Math.max(...(await drive(page)).clutch), { timeout: 5_000 }).toBeLessThan(0.001); // shut
+
+  // Record every step the replay reports, the widest the clutch opens, and where 1-2's ring goes, frame by frame.
+  await page.evaluate(() => {
+    const w = window as unknown as ReplayWindow & { garage: { subscribe(fn: (s: { replay: { step: string | null } | null }) => void): void }; garageDrive(): { clutch: number[]; dogs: number[] } };
+    Object.assign(w, { __steps: [], __clutch: 0, __dogs: [], __driving: [] });
+    w.garage.subscribe((s) => {
+      if (s.replay && w.__steps.at(-1) !== s.replay.step) w.__steps.push(s.replay.step);
+    });
+    requestAnimationFrame(function tick() {
+      const d = w.garageDrive();
+      w.__clutch = Math.max(w.__clutch, ...d.clutch);
+      w.__dogs.push(d.dogs[0]!);
+      const driving = document.querySelector('.gearbox-label.is-driving b')?.textContent ?? 'none';
+      if (w.__driving.at(-1) !== driving) w.__driving.push(driving);
+      requestAnimationFrame(tick);
+    });
+  });
+  // Pull away in 1st, then change up with the engine revving, so the revs drop into 2nd.
+  await page.keyboard.down('r');
+  await expect.poll(() => rpm(page), { timeout: 10_000 }).toBeGreaterThan(4000);
+  await page.keyboard.press('ArrowUp');
+  await expect.poll(() => state(page, 'gear'), { timeout: 5_000 }).toBe(2);
+  await page.keyboard.up('r');
+  await expect(shift.locator('figcaption')).toHaveText('Changing gear: 1st to 2nd, slowed 40×');
+  await expect(shift.locator('li')).toHaveText([/Clutch opens/, /Out of 1st/, /Into 2nd/, /Clutch closes/]);
+  await expect(shift.locator('li.is-now')).toHaveText(/Into 2nd/, { timeout: 5_000 });
+  await page.screenshot({ path: info.outputPath('replay-into-2nd.png') });
+
+  // Slowed 40×, the crate's 0.12 s change plays over about five seconds.
+  await expect.poll(() => page.evaluate(() => (window as unknown as ReplayWindow).__steps.at(-1)), { timeout: 8_000 }).toBeNull();
+  const recorded = await page.evaluate(() => {
+    const w = window as unknown as ReplayWindow;
+    return { steps: w.__steps, clutch: w.__clutch, dogs: w.__dogs, driving: w.__driving };
+  });
+  expect(recorded.steps).toEqual(['open', 'out', 'in', 'close', null]);
+  expect(recorded.driving, 'the labels: 1st drives, then nothing while the clutch is open, then 2nd').toEqual(['1st', 'none', '2nd']);
+  expect(recorded.clutch, 'the clutch pack spreads open').toBeGreaterThan(0.02);
+  expect(Math.min(...recorded.dogs)).toBeLessThan(-0.008);
+  expect(recorded.dogs.some((v) => Math.abs(v) < 0.002), 'the ring passes through the middle').toBe(true);
+  expect(recorded.dogs.at(-1)!).toBeGreaterThan(0.008);
+  expect(Math.max(...(await drive(page)).clutch)).toBeLessThan(0.001);
+  await expect(shift.locator('li.is-done')).toHaveCount(4);
+  await expect(shift).toContainText(/The revs fall from [\d,]+ to [\d,]+ rpm to match it\./);
   expect(errors).toEqual([]);
 });

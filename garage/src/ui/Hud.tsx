@@ -12,6 +12,7 @@ export function Hud() {
   const ready = useGarage((state) => state.ready);
   const dispatch = useGarage((state) => state.dispatch);
   const inside = useGarage((state) => state.inside);
+  const xray = useGarage((state) => state.xray);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -23,7 +24,7 @@ export function Hud() {
 
   if (!ready) return null;
   const hoodOpen = isHoodOpen(view);
-  const crumbs = breadcrumbFor(view, inside);
+  const crumbs = breadcrumbFor(view, inside, xray);
   return (
     <>
       <nav className="crumbs" aria-label="Location">

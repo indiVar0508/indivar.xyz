@@ -1,26 +1,34 @@
-/** The engine on its mounts: a damped roll against the crank whenever engine speed changes, and a running jitter. */
-export type Shake = { roll: number; spin: number; rpm: number; accel: number; time: number };
+/**
+ * The engine on its mounts: a damped lean against the crank by the torque the mounts carry, and a running jitter.
+ *
+ * The engine and gearbox are bolted together, so the mounts carry what spins up the crank plus what the gearbox sends
+ * on down the propshaft (the crate reports it). Revving in neutral that is only the engine's own torque; pulling in
+ * gear it is the clutch's torque multiplied by the gear, so the engine leans hardest in 1st, rocks back as an upshift
+ * cuts the drive, and leans the other way under engine braking.
+ */
+export type Shake = { roll: number; spin: number; time: number };
 
-/** Radians of roll at full acceleration. */
-const MAX_ROLL = 0.012;
-/** rpm/s that counts as full acceleration. */
-const FULL_ACCEL = 14_000;
+/**
+ * N·m of mount torque per radian of lean. Illustrative: no source gives the GTR's mounts, and a race car's are nearly
+ * solid, so they are drawn softer than real so the lean can be seen: about 0.9° revving in neutral, 2° pulling in 1st.
+ */
+export const MOUNT_STIFFNESS = 28_000;
+/** The most the engine leans (radians), however hard the mounts are loaded. */
+export const MAX_ROLL = 0.045;
 const STIFFNESS = 160;
 const DAMPING = 16;
 
-export const newShake = (): Shake => ({ roll: 0, spin: 0, rpm: 0, accel: 0, time: 0 });
+export const newShake = (): Shake => ({ roll: 0, spin: 0, time: 0 });
 
 /**
- * Advances the shake by `dt` seconds at engine speed `rpm` and returns this frame's jitter (x, y in metres). `roll`
- * is the rotation about the crank axis: positive (counter-clockwise from the front) as the clockwise crank speeds up.
+ * Advances the shake by `dt` seconds at engine speed `rpm` with the mounts carrying `mount` N·m, and returns this
+ * frame's jitter (x, y in metres). `roll` is the rotation about the crank axis: positive (counter-clockwise from the
+ * front) as the clockwise crank drives.
  */
-export function stepShake(shake: Shake, rpm: number, running: boolean, dt: number): [number, number] {
+export function stepShake(shake: Shake, rpm: number, mount: number, running: boolean, dt: number): [number, number] {
   const step = Math.min(dt, 0.05);
   if (step <= 0) return [0, 0];
-  const accel = (rpm - shake.rpm) / step;
-  shake.rpm = rpm;
-  shake.accel += (accel - shake.accel) * Math.min(1, step / 0.08);
-  const target = Math.max(-1, Math.min(1, shake.accel / FULL_ACCEL)) * MAX_ROLL;
+  const target = Math.max(-MAX_ROLL, Math.min(MAX_ROLL, mount / MOUNT_STIFFNESS));
   shake.spin += ((target - shake.roll) * STIFFNESS - shake.spin * DAMPING) * step;
   shake.roll += shake.spin * step;
   shake.time += step;

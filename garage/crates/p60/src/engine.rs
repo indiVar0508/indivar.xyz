@@ -438,6 +438,59 @@ mod tests {
         assert_eq!((engine.drive.gear, engine.drive.wheel), (0, 0.0));
     }
 
+    /// The engine and gearbox's mount torque (N·m) after `seconds` at full throttle, rolling in `gear` at `rpm`.
+    fn pulling(gear: usize, rpm: f32, seconds: f32) -> Engine {
+        let mut engine = rolling(gear, rpm);
+        engine.set_pedal(1.0);
+        run(&mut engine, seconds);
+        engine
+    }
+
+    #[test]
+    fn the_mounts_carry_the_torque_the_gearbox_sends_on_so_low_gears_lean_hardest() {
+        // Revving in neutral, the mounts carry only what spins up the crank: the engine's own torque.
+        let mut free = idling();
+        free.set_pedal(1.0);
+        while free.rpm < 5000.0 {
+            free.step(DT);
+        }
+        let neutral = free.drive.mount;
+        assert!(neutral > 250.0 && neutral < PEAK_TORQUE, "neutral {neutral} N·m");
+        // In gear the gearbox multiplies it on its way to the propshaft, and its case takes the reaction.
+        let first = pulling(1, 5000.0, 0.1).drive.mount;
+        let sixth = pulling(6, 5000.0, 0.1).drive.mount;
+        assert!(first > 2.0 * neutral, "1st {first} N·m vs neutral {neutral}");
+        assert!((sixth - neutral).abs() < 0.2 * neutral, "6th {sixth} N·m vs neutral {neutral}");
+    }
+
+    #[test]
+    fn an_upshift_unloads_the_mounts_until_the_next_gear_takes_up_the_drive() {
+        let mut engine = pulling(2, 7000.0, 0.1);
+        let second = engine.drive.mount;
+        assert!(engine.drive.shift_up());
+        let mut least = f32::MAX;
+        for _ in 0..(0.1 / DT) as usize {
+            engine.step(DT);
+            least = least.min(engine.drive.mount);
+        }
+        assert!(least < 0.2 * second, "during the change {least} N·m vs {second} in 2nd");
+        run(&mut engine, 0.4);
+        // 3rd multiplies less, but the change drops the revs back toward the torque peak, so it can carry about as much.
+        let third = engine.drive.mount;
+        assert!(third > 0.6 * second, "3rd {third} N·m vs 2nd {second}");
+    }
+
+    #[test]
+    fn engine_braking_pulls_the_mounts_the_other_way_and_a_stopped_engine_rests_on_them() {
+        let mut engine = rolling(3, 7000.0);
+        run(&mut engine, 0.5);
+        assert!(engine.drive.mount < -50.0, "overrun {} N·m", engine.drive.mount);
+        engine.stop();
+        run(&mut engine, 3.0);
+        assert_eq!(engine.status, Status::Off);
+        assert_eq!(engine.drive.mount, 0.0);
+    }
+
     #[test]
     fn stops_and_resets() {
         let mut engine = idling();

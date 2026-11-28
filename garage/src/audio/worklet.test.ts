@@ -66,8 +66,8 @@ describe('p60-worklet.js', () => {
     expect(last.boost).toBeGreaterThan(0.6);
   });
 
-  it('changes gear on command, reports the gear and the wheels turning, and says when it refuses a change', () => {
-    type Report = { rpm: number; status: number; gear: number; wheel: number; clutch: number; refused?: boolean };
+  it('changes gear on command, reports the gear, the wheels turning and the mounts loading, and says when it refuses a change', () => {
+    type Report = { rpm: number; status: number; gear: number; wheel: number; clutch: number; mount: number; refused?: boolean };
     const processor = loadProcessor();
     const last = () => processor.port.posted.at(-1) as Report;
     processor.port.onmessage!({ data: { type: 'start' } });
@@ -80,6 +80,8 @@ describe('p60-worklet.js', () => {
     expect(last().gear).toBe(1);
     expect(last().wheel).toBeGreaterThan(20);
     expect(last().clutch).toBeGreaterThan(0);
+    // 1st multiplies the clutch's torque on its way out, so the mounts carry more than passes the clutch.
+    expect(last().mount).toBeGreaterThan(1.5 * last().clutch);
     processor.port.onmessage!({ data: { type: 'stop' } });
     render(processor, 4);
     const reports = processor.port.posted as Report[];

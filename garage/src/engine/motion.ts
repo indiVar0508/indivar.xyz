@@ -10,8 +10,18 @@ export const BUTTERFLY_SHUT = 6;
 /** Crank degrees the x-ray turns in `dt` seconds. */
 export const slowStep = (rpm: number, dt: number): number => (rpm / SLOW_MOTION) * 6 * dt;
 
-/** Degrees a belt-driven part turns in `dt` outside the x-ray: its real speed, capped at MAX_SPIN. */
+/** Degrees a fast-spinning part (the turbo's compressor) turns in `dt`: its real speed, capped at MAX_SPIN. */
 export const spinStep = (rpm: number, ratio: number, dt: number): number => Math.min(rpm * 6 * ratio, MAX_SPIN) * dt;
+
+/** The engine speed at which the belt drive's fastest pulley reaches MAX_SPIN: the crate's limiter. */
+export const BELT_FULL_RPM = 8500;
+
+/**
+ * Degrees a belt-driven pulley turns in `dt` outside the x-ray. Real speeds would all strobe, so every pulley is slowed
+ * by the same factor, chosen so the fastest (`fastest`, its ratio to the crank) reaches MAX_SPIN at the limiter. The
+ * drive keeps its true ratios and speeds up and slows down with the revs, so a gear change shows on it.
+ */
+export const beltStep = (rpm: number, ratio: number, fastest: number, dt: number): number => MAX_SPIN * Math.min(Math.max(rpm, 0) / BELT_FULL_RPM, 1) * (ratio / fastest) * dt;
 
 /** A throttle butterfly's angle (degrees from shut-square) for an engine load of 0 to 1. */
 export const butterflyAngle = (load: number): number => BUTTERFLY_SHUT + (90 - BUTTERFLY_SHUT) * Math.max(0, Math.min(1, load));

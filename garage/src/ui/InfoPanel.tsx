@@ -4,6 +4,7 @@ import { insideLive } from '../engine/live';
 import type { Badge, Topic } from '../content/types';
 import { useGarage } from '../state/store';
 import { GearStrip } from './GearStrip';
+import { ShiftSteps } from './ShiftSteps';
 import { topicFor } from './topicFor';
 
 const BADGE_LABEL: Record<Badge, string> = { verified: 'Verified', illustrative: 'Illustrative', 'game-lore': 'Game lore' };
@@ -115,15 +116,25 @@ function PanelBody({ topic, eyebrow, hint, extra }: { topic: Topic; eyebrow: str
 export function InfoPanel() {
   const view = useGarage((state) => state.view);
   const inside = useGarage((state) => state.inside);
+  const xray = useGarage((state) => state.xray);
   const engine = useGarage((state) => state.engine);
-  const topic = topicFor(view, inside);
+  const topic = topicFor(view, inside, xray);
   if (!topic) return null;
   const inBay = view.kind === 'bay' || view.kind === 'bay-part';
   if (topic.id === 'running') {
     const note = engine === 'off' || engine === 'stopping' ? 'Start the engine to see it run.' : null;
     return <PanelBody key={topic.id} topic={topic} eyebrow="P60B40 V8" hint={null} extra={<FiringStrip note={note} />} />;
   }
-  if (topic.id === 'drivetrain') return <PanelBody key={topic.id} topic={topic} eyebrow="BMW M3 GTR" hint={null} extra={<GearStrip />} />;
+  if (topic.id === 'gearbox-running') return <PanelBody key={topic.id} topic={topic} eyebrow="BMW M3 GTR" hint={null} extra={<ShiftSteps />} />;
+  if (topic.id === 'drivetrain') {
+    const extra = (
+      <>
+        <ShiftSteps />
+        <GearStrip />
+      </>
+    );
+    return <PanelBody key={topic.id} topic={topic} eyebrow="BMW M3 GTR" hint={null} extra={extra} />;
+  }
   const hint = view.kind === 'bay' ? 'Pick a highlighted part to see what it does.' : null;
   return <PanelBody key={topic.id} topic={topic} eyebrow={inBay ? 'P60B40 V8' : 'BMW M3 GTR'} hint={hint} />;
 }

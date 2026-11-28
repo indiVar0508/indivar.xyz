@@ -62,6 +62,7 @@ export const CAR_TOPICS: Record<CarTopicId, Topic<CarTopicId>> = {
       { text: 'Straight-cut gears are strong and waste little power, but they whine, loudest under load. Listen for it as you rev in gear.', badge: 'illustrative', sources: [] },
       { text: 'The rollers stand in for the road. They load the rear wheels with the car’s weight and drag, so changing up drops the revs to suit the road speed.', badge: 'illustrative', sources: [] },
       { text: 'In the x-ray, slowed 40×: the dog ring locks the chosen gear to the output shaft, while the others spin free at their own speeds. A slipping clutch shows as the flywheel and the discs turning apart.', badge: 'illustrative', sources: [] },
+      { text: 'A gear change takes about a tenth of a second, so the x-ray replays each one slowed 40×: the clutch opens, a fork slides one dog ring out of the old gear and one into the new, and the clutch closes again. The live engine and its sound carry on at full speed meanwhile. The clutch is drawn opening far wider than a real one, which moves about a millimetre.', badge: 'illustrative', sources: [] },
       { text: 'The ratios, the 3.85:1 final drive, the tyre size, the gearbox’s layout and where it sits are illustrative: no source gives them.', badge: 'illustrative', sources: [] },
     ],
     game: [
@@ -94,4 +95,19 @@ export const CAR_TOPICS: Record<CarTopicId, Topic<CarTopicId>> = {
       { text: 'In the game it has strong handling, acceleration and top speed, but only a mediocre nitrous boost.', badge: 'game-lore', sources: [S.nfsCar] },
     ],
   },
+};
+
+/** Shown while looking inside at the gearbox, alone or behind the engine. */
+export const GEARBOX_RUNNING: Topic<'gearbox-running'> = {
+  id: 'gearbox-running',
+  title: 'How the gearbox works',
+  summary: 'Six gears always turning; a dog ring locks one to the wheels.',
+  real: [
+    { text: 'A triple-disc carbon-fibre clutch and a straight-cut six-speed manual gearbox.', badge: 'verified', sources: [S.bmwPress2001] },
+    { text: 'The clutch joins the engine to the input shaft, which turns the layshaft below it. Each gear on the layshaft is always meshed with a partner on the output shaft, so all six pairs turn all the time, each at its own speed: the labels show them.', badge: 'illustrative', sources: [] },
+    { text: 'The gears on the output shaft spin free on it until a dog ring, which turns with the shaft, slides into one and locks it. That gear drives the wheels, so it turns at exactly the output shaft’s speed; the others don’t.', badge: 'illustrative', sources: [] },
+    { text: 'Changing gear takes about a tenth of a second, so the x-ray replays it slowed 40×: the clutch opens, a fork slides the ring out of one gear and into the next, and the clutch closes as the revs change to suit the new gear.', badge: 'illustrative', sources: [] },
+    { text: 'Shown slowed 40×. The ratios and the layout are illustrative, and the clutch opens far wider than a real one, which moves about a millimetre.', badge: 'illustrative', sources: [] },
+  ],
+  game: [],
 };

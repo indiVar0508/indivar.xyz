@@ -39,6 +39,15 @@ describe('topicFor and breadcrumbFor', () => {
     expect(topicFor({ kind: 'bay-part', id: 'crank' }, true)?.title).toBe('Flat-plane crankshaft');
     expect(topicFor({ kind: 'bay' }, false)?.title).toBe('P60B40 V8');
   });
+
+  it('explains how the gearbox works when looking inside at it, alone or with the engine', () => {
+    expect(topicFor({ kind: 'bay' }, true, 'engine')?.id).toBe('running');
+    expect(topicFor({ kind: 'bay' }, true, 'gearbox')?.id).toBe('gearbox-running');
+    expect(topicFor({ kind: 'bay' }, true, 'both')?.id).toBe('gearbox-running');
+    expect(topicFor({ kind: 'bay-part', id: 'crank' }, true, 'gearbox')?.title).toBe('Flat-plane crankshaft');
+    expect(breadcrumbFor({ kind: 'bay' }, true, 'gearbox')).toEqual(['Garage', 'Engine bay', 'Gearbox']);
+    expect(breadcrumbFor({ kind: 'bay' }, true, 'both')).toEqual(['Garage', 'Engine bay', 'Engine and gearbox']);
+  });
 });
 
 describe('carHotspot', () => {

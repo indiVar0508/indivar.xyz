@@ -4,12 +4,18 @@ const GEARS = [1, 2, 3, 4, 5, 6] as const;
 export const DOG_NODES = ['Dog_12', 'Dog_34', 'Dog_56'] as const;
 export const FORK_NODES = ['Fork_12', 'Fork_34', 'Fork_56'] as const;
 export const ROLLER_NODES = ['Roller_RL_front', 'Roller_RL_rear', 'Roller_RR_front', 'Roller_RR_rear'] as const;
+/**
+ * The clutch pack behind the flywheel, front to back: the carbon discs, which turn with the gearbox, between the
+ * steel plates, which turn with the engine. Each slides back by extras.spread (m) as the clutch opens.
+ */
+export const CLUTCH_NODES = ['Clutch_disc_1', 'Clutch_plate_1', 'Clutch_disc_2', 'Clutch_plate_2', 'Clutch_disc_3', 'Clutch_plate_3', 'Clutch_plate_4'] as const;
 export const gearNode = (gear: number) => `Gear_${gear}`;
 export const layNode = (gear: number) => `Lay_${gear}`;
 
 /** The pivots the page turns or slides; each holds no mesh of its own. */
 export const DRIVE_PIVOTS = [
   'Flywheel',
+  ...CLUTCH_NODES,
   'Input',
   'Layshaft',
   ...GEARS.map(layNode),
@@ -36,6 +42,8 @@ export type DriveAssetFacts = {
   dogTravel: Record<string, unknown>;
   /** Each roller's radius (m), from its extras. */
   rollerRadii: Record<string, unknown>;
+  /** How far each piece of the clutch pack slides back as the clutch opens (m), from its extras. */
+  clutchSpread: Record<string, unknown>;
 };
 
 const positive = (value: unknown) => typeof value === 'number' && value > 0;
@@ -48,5 +56,6 @@ export function driveAssetErrors(facts: DriveAssetFacts): string[] {
   for (const name of facts.pivotsWithMeshes) errors.push(`${name} holds its mesh directly; quantization would move its pivot`);
   for (const name of DOG_NODES) if (have.has(name) && !positive(facts.dogTravel[name])) errors.push(`${name} has no travel in its extras`);
   for (const name of ROLLER_NODES) if (have.has(name) && !positive(facts.rollerRadii[name])) errors.push(`${name} has no radius in its extras`);
+  for (const name of CLUTCH_NODES) if (have.has(name) && !positive(facts.clutchSpread[name])) errors.push(`${name} has no spread in its extras`);
   return errors;
 }

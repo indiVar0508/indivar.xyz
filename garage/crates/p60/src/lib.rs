@@ -124,6 +124,12 @@ pub extern "C" fn synth_clutch() -> f32 {
     synth().engine.drive.clutch
 }
 
+/// Torque the engine and gearbox put into their mounts, N·m: positive as the engine drives, larger in lower gears.
+#[no_mangle]
+pub extern "C" fn synth_mount() -> f32 {
+    synth().engine.drive.mount
+}
+
 /// The gearbox's tooth counts, by index: the constant-mesh pair (input, layshaft), then each gear's layshaft and
 /// output teeth from 1st to 6th, then the final drive's pinion and crown wheel.
 #[no_mangle]

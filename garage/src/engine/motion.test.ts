@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { butterflyAngle, crankTurn, MAX_SPIN, SLOW_MOTION, slowStep, spinStep, wheelTurn } from './motion';
+import { BELT_FULL_RPM, beltStep, butterflyAngle, crankTurn, MAX_SPIN, SLOW_MOTION, slowStep, spinStep, wheelTurn } from './motion';
 
 describe('motion', () => {
   it('slows the x-ray so idle takes seconds per cycle', () => {
@@ -12,6 +12,16 @@ describe('motion', () => {
     expect(spinStep(30, 2, 1)).toBe(360);
     expect(spinStep(1500, 2.2, 1)).toBe(MAX_SPIN);
     expect(spinStep(0, 2, 1)).toBe(0);
+  });
+
+  it('slows the belt drive by one factor, so its pulleys keep their ratios and follow the revs, the fastest just reaching the cap at the limiter', () => {
+    expect(beltStep(BELT_FULL_RPM, 2.5, 2.5, 1)).toBeCloseTo(MAX_SPIN, 9);
+    expect(beltStep(BELT_FULL_RPM / 2, 2.5, 2.5, 1)).toBeCloseTo(MAX_SPIN / 2, 9);
+    expect(beltStep(4000, 1, 2.5, 1) / beltStep(4000, 2.5, 2.5, 1)).toBeCloseTo(1 / 2.5, 9);
+    // An upshift from 8,000 to 6,000 rpm slows every pulley by a quarter.
+    expect(beltStep(6000, 2.2, 2.5, 1) / beltStep(8000, 2.2, 2.5, 1)).toBeCloseTo(0.75, 9);
+    expect(beltStep(BELT_FULL_RPM + 300, 2.5, 2.5, 1)).toBe(MAX_SPIN);
+    expect(beltStep(0, 2, 2.5, 1)).toBe(0);
   });
 
   it('turns the wheels slowed with the x-ray, and outside it at their real speed until they would strobe', () => {

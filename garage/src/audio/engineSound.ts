@@ -12,11 +12,11 @@ export const WORKLET_URL = `${import.meta.env.BASE_URL}wasm/p60-worklet.js`;
 /**
  * The engine as the audio thread last reported it, for the tach and the animation, which read it every frame: speed,
  * load (what the throttle and idle control give it, 0 to 1), turbo boost (0 to 1), the gear (0 is neutral), the rear
- * wheels' speed on the rollers (rad/s) and the torque through the clutch (N·m).
+ * wheels' speed on the rollers (rad/s), the torque through the clutch and the torque on the engine's mounts (N·m).
  */
-export const engineLive = { rpm: 0, load: 0, boost: 0, status: 'off' as EngineStatus, gear: 0, wheel: 0, clutch: 0 };
+export const engineLive = { rpm: 0, load: 0, boost: 0, status: 'off' as EngineStatus, gear: 0, wheel: 0, clutch: 0, mount: 0 };
 
-type Report = { rpm: number; load: number; boost: number; status: number; gear: number; wheel: number; clutch: number; refused?: boolean };
+type Report = { rpm: number; load: number; boost: number; status: number; gear: number; wheel: number; clutch: number; mount: number; refused?: boolean };
 
 /** What the page hears from the audio thread besides the live values. */
 export type EngineEvents = {
@@ -42,6 +42,7 @@ export class EngineSound {
       engineLive.boost = data.boost;
       engineLive.wheel = data.wheel;
       engineLive.clutch = data.clutch;
+      engineLive.mount = data.mount;
       if (status !== engineLive.status) {
         engineLive.status = status;
         events.status(status);
@@ -92,6 +93,7 @@ export class EngineSound {
     engineLive.gear = 0;
     engineLive.wheel = 0;
     engineLive.clutch = 0;
+    engineLive.mount = 0;
   }
 
   throttle(pedal: number): void {

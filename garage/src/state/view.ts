@@ -15,6 +15,12 @@ export type ViewAction =
 
 export const SHOWROOM: View = { kind: 'showroom' };
 
+/** What looking inside from the engine bay shows: the engine, the clutch and gearbox behind it, or both. */
+export type XrayView = 'engine' | 'gearbox' | 'both';
+
+/** Whether an x-ray view shows the clutch and gearbox (with the body around them as an x-ray). */
+export const showsGearbox = (xray: XrayView): boolean => xray !== 'engine';
+
 export const isHoodOpen = (view: View): boolean => view.kind === 'bay' || view.kind === 'bay-part';
 
 /** The gearbox and drive view: the body turns to an x-ray around the driveline. */

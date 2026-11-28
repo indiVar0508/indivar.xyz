@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { HASH_FILE, wasmSourceHash } from '../../tools/wasm-source';
 import { cylinderLayout, P60 } from './geometry';
+import { BELT_FULL_RPM } from './motion';
 import { FRAME, instantiateP60, Kinematics, P60_CONSTANT, type P60Exports } from './p60';
 
 const WASM = resolve(import.meta.dirname, '../../public/wasm/p60.wasm');
@@ -17,6 +18,10 @@ beforeAll(async () => {
 describe('p60.wasm', () => {
   it('is built from the crate as it stands (run npm run build:wasm after changing crates/p60)', () => {
     expect(readFileSync(HASH_FILE, 'utf8').trim()).toBe(wasmSourceHash());
+  });
+
+  it("slows the belt drive to the crate's limiter", () => {
+    expect(BELT_FULL_RPM).toBe(wasm.p60_constant(P60_CONSTANT.limitRpm));
   });
 
   it('fires in the verified order, one cylinder every 90°', () => {

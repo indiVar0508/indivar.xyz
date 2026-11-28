@@ -11,6 +11,7 @@ export const ENGINE_OVERVIEW: Topic<'overview'> = {
   real: [
     { text: 'A naturally aspirated 4.0-litre V8 built by BMW M for sports-car racing from 2001 to 2005.', badge: 'verified', sources: [S.p60] },
     { text: 'About 444 bhp at 7,500 rpm in race trim with air restrictors; the 10 road cars were rated at 380 hp.', badge: 'verified', sources: [S.p60, S.bmwClassic] },
+    { text: 'Running, the engine leans on its mounts against the crank’s turn. In gear the gearbox multiplies its torque on the way to the wheels, so it leans hardest in 1st, rocks back as you change up, and leans the other way when you lift off. The belts turn with the revs, slowed so they never strobe. The lean is drawn larger than a race car’s stiff mounts would allow.', badge: 'illustrative', sources: [] },
   ],
   game: [],
 };

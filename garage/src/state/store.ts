@@ -1,9 +1,10 @@
 import { create } from 'zustand';
 import type { EngineStatus } from '../audio/engineSound';
+import type { Change, ReplayStep } from '../drive/shiftReplay';
 import type { RadioState } from '../music/radio';
 import { FORCED_QUALITY } from '../qa';
 import { initialQuality, readDeviceHints, type Quality } from './quality';
-import { isHoodOpen, reduceView, SHOWROOM, type View, type ViewAction } from './view';
+import { isHoodOpen, reduceView, SHOWROOM, type View, type ViewAction, type XrayView } from './view';
 
 export type GarageStore = {
   view: View;
@@ -26,12 +27,16 @@ export type GarageStore = {
   engineError: string | null;
   /** The engine is shown as an x-ray with its moving parts inside. Only while the hood is open. */
   inside: boolean;
+  /** Which x-ray looking inside shows; kept while outside, so looking in again returns to it. */
+  xray: XrayView;
   /** The game turbo kit is fitted. The real P60B40 is naturally aspirated; this is not remembered between visits. */
   turbo: boolean;
   /** The gear the gearbox last reported: 0 is neutral, 1 to 6 the gears. */
   gear: number;
   /** Why the gearbox refused the last change, until the next one. */
   driveNote: string | null;
+  /** The last gear change the x-ray replayed, and the step it is on (null once it has played), while the x-ray shows. */
+  replay: { change: Change; step: ReplayStep | null } | null;
   dispatch: (action: ViewAction) => void;
   setQuality: (quality: Quality) => void;
   setReady: () => void;
@@ -45,8 +50,11 @@ export type GarageStore = {
   setEngine: (status: EngineStatus) => void;
   setEngineError: (message: string | null) => void;
   setInside: (inside: boolean) => void;
+  /** Looks inside at `look`, or back outside (null). Only with the hood open. */
+  setLook: (look: XrayView | null) => void;
   setTurbo: (fitted: boolean) => void;
   setGear: (gear: number) => void;
+  setReplay: (replay: GarageStore['replay']) => void;
   setDriveNote: (note: string | null) => void;
 };
 
@@ -69,9 +77,11 @@ export const useGarage = create<GarageStore>()((set) => ({
   engine: 'off',
   engineError: null,
   inside: false,
+  xray: 'engine',
   turbo: false,
   gear: 0,
   driveNote: null,
+  replay: null,
   dispatch: (action) =>
     set((state) => {
       const view = reduceView(state.view, action);
@@ -90,7 +100,9 @@ export const useGarage = create<GarageStore>()((set) => ({
   setEngine: (engine) => set({ engine }),
   setEngineError: (engineError) => set({ engineError }),
   setInside: (inside) => set((state) => ({ inside: inside && isHoodOpen(state.view) })),
+  setLook: (look) => set((state) => (look === null ? { inside: false } : isHoodOpen(state.view) ? { inside: true, xray: look } : {})),
   setTurbo: (turbo) => set({ turbo }),
   setGear: (gear) => set({ gear, driveNote: null }),
   setDriveNote: (driveNote) => set({ driveNote }),
+  setReplay: (replay) => set({ replay }),
 }));

@@ -102,4 +102,15 @@ describe('setXray', () => {
     expect(materialOf(rig.parts.heads)).toBe(solid);
     expect(rig.parts.heads.children[0]!.castShadow).toBe(true);
   });
+
+  it('turns the bay into a ghost too when asked, so the gearbox behind it shows, and back', () => {
+    const { root } = fakeEngine();
+    const rig = prepareEngine(root);
+    const bay = (rig.bay.children[0] as Mesh).material;
+    setXray(rig, true, null, true);
+    expect((rig.bay.children[0] as Mesh).material).toBeInstanceOf(ShaderMaterial);
+    expect(rig.bay.children[0]!.castShadow).toBe(false);
+    setXray(rig, true, null, false);
+    expect((rig.bay.children[0] as Mesh).material).toBe(bay);
+  });
 });

@@ -4,7 +4,7 @@ import { engineLive } from '../audio/engineSound';
 import { gearLabel, kmh } from '../drive/gears';
 import { loadKinematics } from '../engine/p60';
 import { useGarage } from '../state/store';
-import { isHoodOpen } from '../state/view';
+import { isHoodOpen, showsGearbox, type XrayView } from '../state/view';
 
 const TACH_MAX = 9000;
 
@@ -21,11 +21,18 @@ async function startEngine(): Promise<void> {
   }
 }
 
-function toggleInside(): void {
-  const { view, inside, dispatch, setInside } = useGarage.getState();
+/** Looks inside at the engine, the gearbox or both, opening the hood first; picking the view shown steps back out. */
+function look(xray: XrayView): void {
+  const { view, inside, xray: shown, dispatch, setLook } = useGarage.getState();
   if (!isHoodOpen(view)) dispatch({ type: 'select-car', id: 'hood' });
-  setInside(!inside);
+  setLook(inside && shown === xray ? null : xray);
 }
+
+const LOOKS: { xray: XrayView; name: string; long: string; short: string }[] = [
+  { xray: 'engine', name: 'Look inside the engine', long: 'Engine', short: 'Engine' },
+  { xray: 'gearbox', name: 'Look inside the gearbox', long: 'Gearbox', short: 'Gears' },
+  { xray: 'both', name: 'Look inside both', long: 'Engine + gearbox', short: 'Both' },
+];
 
 /** A button's full label, shortened on phones to a word that stays inside the full one (its accessible name). */
 const Label = ({ long, short }: { long: string; short: string }) => (
@@ -171,9 +178,13 @@ export function EngineDock() {
   const engine = useGarage((state) => state.engine);
   const error = useGarage((state) => state.engineError);
   const inside = useGarage((state) => state.inside);
+  const xray = useGarage((state) => state.xray);
   const turbo = useGarage((state) => state.turbo);
   const driveNote = useGarage((state) => state.driveNote);
+  // With the hood open, outside the x-ray, the clutch and gearbox are hidden behind the engine.
+  const inGear = useGarage((state) => state.gear > 0 && isHoodOpen(state.view));
   const stopped = engine === 'off' || engine === 'stopping';
+  const hint = turbo ? 'Game turbo kit fitted. It’s only in Most Wanted: the real P60B40 has no turbo.' : inGear && !(inside && showsGearbox(xray)) ? 'Look inside the gearbox to watch it change gear.' : '';
   return (
     <section className="engine-dock" aria-label="Engine">
       {stopped ? (
@@ -192,14 +203,21 @@ export function EngineDock() {
           <GearControls />
         </Suspense>
       )}
-      <button type="button" className="hud-button" aria-label="Look inside" aria-pressed={inside} onClick={toggleInside}>
-        <Label long="Look inside" short="Inside" />
-      </button>
+      <div className="engine-look" role="group" aria-label="Look inside">
+        <span className="engine-look-caption" aria-hidden="true">Look inside</span>
+        <div className="engine-look-buttons">
+          {LOOKS.map(({ xray: id, name, long, short }) => (
+            <button key={id} type="button" className="hud-button" data-view={id} aria-label={name} aria-pressed={inside && xray === id} onClick={() => look(id)}>
+              <Label long={long} short={short} />
+            </button>
+          ))}
+        </div>
+      </div>
       <button type="button" className="hud-button engine-turbo" aria-label="Game turbo" aria-pressed={turbo} onClick={() => useGarage.getState().setTurbo(!turbo)}>
         <Label long="Game turbo" short="Turbo" />
       </button>
       <p className="engine-note" role="status">
-        {error ?? driveNote ?? (turbo ? 'Game turbo kit fitted. It’s only in Most Wanted: the real P60B40 has no turbo.' : '')}
+        {error ?? driveNote ?? hint}
       </p>
     </section>
   );

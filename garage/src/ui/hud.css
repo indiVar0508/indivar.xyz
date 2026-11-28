@@ -104,10 +104,40 @@ body:has(.radio) .engine-dock { max-width: calc(100% - 436px); }
 .gear-top, .gear-pull { text-align: right; }
 .gears .gear-live { color: var(--silver); font-variant-numeric: tabular-nums; }
 .gears .gear-note { color: var(--amber); }
+.engine-look { display: flex; flex-direction: column; gap: 3px; }
+.engine-look-caption { font: 10px/1 var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); padding-left: 6px; }
+.engine-look-buttons { display: flex; gap: 4px; flex: 1; }
 .engine-turbo[aria-pressed='true'] { border-color: var(--amber); background: rgba(255, 179, 92, 0.22); }
 .label-short { display: none; }
 .engine-note { flex-basis: 100%; margin: 0; font: 11px/1.4 var(--mono); color: var(--amber); text-align: right; }
 .engine-note:empty { display: none; }
+.gearbox-pin { position: absolute; left: 0; display: flex; flex-direction: column; align-items: center; transform: translate(-50%, -100%); pointer-events: none; }
+.gearbox-pin.is-below { flex-direction: column-reverse; transform: translate(-50%, 0); }
+.gearbox-stem { display: block; width: 1px; background: rgba(201, 206, 214, 0.55); }
+.gearbox-label { display: grid; gap: 1px; padding: 3px 7px; border: 1px solid var(--line); border-left-width: 3px; background: rgba(7, 9, 12, 0.78); color: var(--muted); font: 11px/1.25 var(--mono); white-space: nowrap; pointer-events: none; user-select: none; }
+.gearbox-label b { font: 600 13px/1.1 var(--font); color: var(--silver); }
+.gearbox-label.part { border-left-color: var(--blue); }
+.gearbox-label.gear.is-driving { border-color: #ff7a1a; color: var(--silver); background: rgba(70, 30, 6, 0.85); }
+.gearbox-label.gear.is-driving b { color: #ffb36b; }
+.gearbox-label.gear.is-locked { border-color: #7fd4ff; color: var(--silver); }
+.gearbox-label.gear.is-free { opacity: 0.8; }
+/* Phones: too little room for every speed, so each gear shows just its name, lit while it drives; the panel explains. */
+@media (max-width: 720px) {
+  .gearbox-label { padding: 1px 5px; }
+  .gearbox-label b { font-size: 11px; }
+  .gearbox-label span, .gearbox-pin:has(.part) { display: none; }
+}
+.shift { margin: 0 0 14px; }
+.shift figcaption { font: 11px/1.4 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.shift ol { display: grid; gap: 4px; margin: 6px 0 0; padding: 0; list-style: none; counter-reset: shift; }
+.shift li { display: grid; gap: 4px; padding: 6px 8px; border: 1px solid var(--line); color: var(--muted); counter-increment: shift; transition: background 0.15s, color 0.15s, border-color 0.15s; }
+.shift-title { font: 600 14px/1.2 var(--font); }
+.shift-title::before { content: counter(shift) '  '; font-family: var(--mono); color: var(--muted); }
+.shift li.is-done { color: var(--silver); }
+.shift li.is-now { border-color: #7fd4ff; background: rgba(127, 212, 255, 0.14); color: var(--silver); }
+.shift li.is-now .shift-title::before { color: #7fd4ff; }
+.shift-text { font: 13px/1.45 var(--font); color: var(--silver); }
+.shift .shift-note { margin: 6px 0 0; font: 11px/1.4 var(--mono); color: var(--amber); }
 .firing { margin: 0 0 14px; }
 .firing figcaption, .firing p { font: 11px/1.4 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
 .firing p { margin: 6px 0 0; letter-spacing: 0; text-transform: none; }
@@ -118,7 +148,7 @@ body:has(.radio) .engine-dock { max-width: calc(100% - 436px); }
 .firing li.is-firing { background: rgba(255, 140, 50, 0.85); color: #07090c; }
 .firing .firing-note { color: var(--amber); }
 @media (prefers-reduced-motion: reduce) {
-  .firing li { transition: none; }
+  .firing li, .shift li { transition: none; }
 }
 @media (max-width: 720px) {
   /* Phones: the engine controls flow in among the HUD buttons, above the bottom sheet, and every button gets more
@@ -129,6 +159,11 @@ body:has(.radio) .engine-dock { max-width: calc(100% - 436px); }
   .gear-readout { min-width: 52px; padding: 2px 8px; }
   .gear-now { font-size: 18px; }
   .label-short { display: inline; }
+  /* Phones: the views stay one tight group on the second row, with Turbo, as Look inside alone did, so the buttons
+     don't grow over the engine's markers. Engine + gearbox is left out: on a phone both are too small to follow. */
+  .engine-look-caption, .engine-look [data-view='both'] { display: none; }
+  .engine-look-buttons { gap: 2px; }
+  .hud-actions .engine-look .hud-button { padding-left: 7px; padding-right: 7px; }
   .tach { width: 84px; padding: 4px 9px; }
   .tach-reading { font-size: 14px; }
 }

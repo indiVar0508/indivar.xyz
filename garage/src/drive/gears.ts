@@ -34,6 +34,23 @@ export const wheelTorque = (box: Gearbox, gear: number, clutch: number): number 
 /** Road speed (km/h) at an engine speed in a gear, with the clutch shut. */
 export const speedAt = (box: Gearbox, gear: number, rpm: number): number => kmh(box, (rpm * Math.PI) / 30 / overallRatio(box, gear));
 
+export type ShaftSpeeds = { input: number; layshaft: number; gears: number[]; output: number };
+
+/**
+ * Each shaft's speed and each gear's on the output shaft (rpm), for the input and output shafts' speeds. Every gear
+ * is always in mesh, so the layshaft turns all six; only the one a dog ring locks turns with the output shaft.
+ */
+export function shaftSpeeds(box: Gearbox, { input, output }: { input: number; output: number }): ShaftSpeeds {
+  const layshaft = input / reduction(box.constantMesh);
+  return { input, layshaft, gears: box.gears.map((pair) => layshaft / reduction(pair)), output };
+}
+
+/** The speeds as the gearbox reports them: in gear the gearbox turns with the wheels, in neutral with the engine. */
+export function liveShaftSpeeds(box: Gearbox, { rpm, gear, wheel }: { rpm: number; gear: number; wheel: number }): ShaftSpeeds {
+  const output = (wheel * reduction(box.finalDrive) * 60) / (2 * Math.PI);
+  return shaftSpeeds(box, { input: gear > 0 ? output * gearboxRatio(box, gear) : rpm, output });
+}
+
 export const gearLabel = (gear: number): string => (gear === 0 ? 'N' : String(gear));
 
 export const ordinal = (n: number): string => `${n}${n === 1 ? 'st' : n === 2 ? 'nd' : n === 3 ? 'rd' : 'th'}`;

@@ -12,8 +12,11 @@ limited-slip differential. No source shows their insides or says where the gearb
 illustrative: a conventional gearbox behind the engine, as in the road M3, then a propshaft to a hypoid differential.
 
 Driveline (shown only in the drivetrain x-ray), each moving part a pivot whose mesh hangs off <name>_mesh:
-- Flywheel: on the crank's axis, with the clutch's steel plates; turns with the engine.
-- Input: the input shaft, the constant-mesh gear and the three carbon clutch discs; turns with the gearbox.
+- Flywheel: on the crank's axis, with the bolts that carry the clutch's steel plates; turns with the engine.
+- Clutch_disc_1..3, Clutch_plate_1..4: the clutch pack behind it, front to back disc, plate, disc, plate, disc, plate,
+  plate. The carbon discs turn with the gearbox, the steel plates with the engine; each slides back extras.spread (m)
+  as the clutch opens, drawn far wider than a real clutch's fraction of a millimetre so the opening shows.
+- Input: the input shaft and the constant-mesh gear; turns with the gearbox.
 - Layshaft, Lay_1..Lay_6: the layshaft's constant-mesh gear and its six gears, below the main shafts.
 - Gear_1..Gear_6: each gear's wheel on the output shaft, turning free until its dog ring locks it.
 - Output: the output shaft and its flange. Dog_12/34/56 turn with it and slide extras.travel (m) toward a gear,
@@ -39,6 +42,7 @@ CENTRES = 0.075  # between the main shafts and the layshaft
 LAY_DROP = Vector((0, -CENTRES, 0))
 FACE = 0.016  # each gear's face width
 DOG_TRAVEL = 0.009
+CLUTCH_SPREAD = 0.004  # how much wider each gap in the clutch pack opens (m): illustrative, real clutches move ~1 mm
 # Gear centres along z (car space), front to back: the constant-mesh pair, then 6, 5, 4, 3, 2, 1, with a dog ring
 # between each pair of gears.
 Z_CONSTANT = 0.770
@@ -132,20 +136,23 @@ def knurled(radius, length, flutes=36, depth=0.0025):
 
 def build_clutch(axis, z_fly, parent):
     """The flywheel, then the clutch pack behind it: three carbon discs on the input shaft, between steel plates that
-    turn with the flywheel. BMW's release gives a triple-disc carbon-fibre clutch; the sizes are illustrative."""
-    plates = [moved(be.cylinder(0.13, 0.012, segments=48, bevel=0.002), z=-0.006)]  # the flywheel's face, at z_fly
-    for k in range(4):  # two intermediate plates and the pressure plate
-        z = -0.018 - 0.012 * k
-        plates.append(moved(be.cylinder(0.078, 0.004, segments=40), z=z))
-    for k in range(6):  # the bolts that carry the plates, round the outside of the pack, where they show
+    turn with the flywheel. BMW's release gives a triple-disc carbon-fibre clutch; the sizes are illustrative. Each
+    piece of the pack is its own pivot, so the page can spread them apart as the clutch opens."""
+    fly = [moved(be.cylinder(0.13, 0.012, segments=48, bevel=0.002), z=-0.006)]  # the flywheel's face, at z_fly
+    for k in range(6):  # the bolts that carry the plates, round the outside of the pack, long enough for it open
         a = 2 * math.pi * k / 6
-        plates.append(moved(be.cylinder(0.005, 0.05, segments=8), x=0.084 * math.cos(a), y=0.084 * math.sin(a), z=-0.035))
-    pivot("Flywheel", [(bm, "steel") for bm in plates], origin=(axis.x, axis.y, z_fly), parent=parent)
-    discs = []
-    for k in range(3):
-        discs.append(moved(be.cylinder(0.072, 0.005, segments=40), z=z_fly - 0.012 - 0.012 * k))
-        discs.append(moved(be.cylinder(0.022, 0.009, segments=6), z=z_fly - 0.012 - 0.012 * k))  # splined hub
-    return discs
+        fly.append(moved(be.cylinder(0.005, 0.075, segments=8), x=0.084 * math.cos(a), y=0.084 * math.sin(a), z=-0.0475))
+    pivot("Flywheel", [(bm, "steel") for bm in fly], origin=(axis.x, axis.y, z_fly), parent=parent)
+    # Front to back: disc, plate, disc, plate, disc, then the pressure plate and its backing plate, which move together.
+    pack = [("Clutch_disc_1", -0.012), ("Clutch_plate_1", -0.018), ("Clutch_disc_2", -0.024), ("Clutch_plate_2", -0.030),
+            ("Clutch_disc_3", -0.036), ("Clutch_plate_3", -0.042), ("Clutch_plate_4", -0.054)]
+    for k, (name, z) in enumerate(pack):
+        if name.startswith("Clutch_disc"):
+            pieces = [(be.cylinder(0.072, 0.005, segments=40), "carbon"), (be.cylinder(0.022, 0.009, segments=6), "carbon")]  # and its splined hub
+        else:
+            pieces = [(be.cylinder(0.078, 0.004, segments=40), "steel")]
+        spread = CLUTCH_SPREAD * min(k + 1, 6)
+        pivot(name, pieces, origin=(axis.x, axis.y, z_fly + z), parent=parent, spread=spread)
 
 
 def build_gearbox(cfg, axis, parent):
@@ -155,9 +162,9 @@ def build_gearbox(cfg, axis, parent):
     z_fly = cfg["engineOrigin"][2] - 0.30
     lay = axis + LAY_DROP
 
-    # Input: the clutch discs, the shaft, and its half of the constant-mesh pair, turning on the crank's axis.
-    pieces = [(disc, "carbon") for disc in build_clutch(axis, z_fly, parent)]
-    pieces = [(moved(bm, z=-z_fly), mat) for bm, mat in pieces]  # relative to the input's origin, set below
+    # Input: the shaft and its half of the constant-mesh pair, turning on the crank's axis, behind the clutch.
+    build_clutch(axis, z_fly, parent)
+    pieces = []
     shaft = moved(be.cylinder(0.012, z_fly - 0.012 - Z_CONSTANT + 0.004, segments=16), z=(z_fly - 0.012 + Z_CONSTANT - 0.004) / 2 - z_fly)
     pieces.append((shaft, "shaft"))
     pieces.append((spur(cm_in, m_cm, Z_CONSTANT - FACE / 2 - z_fly, Z_CONSTANT + FACE / 2 - z_fly), "gear"))
